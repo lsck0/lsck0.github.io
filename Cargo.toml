@@ -10,4 +10,15 @@ lto = "fat"
 opt-level = "z"
 panic = "abort"
 
+[dev-dependencies]
+wasm-bindgen = "0.2.112"
+wasm-bindgen-test = "0.3.62"
+web-sys = { version = "0.3.89", features = ["Document", "Window"] }
+
 [dependencies]
+leptos = { version = "0.8.16", features = ["csr", "nightly"] }
+leptos_meta = { version = "0.8.6" }
+leptos_router = { version = "0.8.12", features = ["nightly"] }
+console_log = "1.0.0"
+log = "0.4.29"
+console_error_panic_hook = "0.1.7"
