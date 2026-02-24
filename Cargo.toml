@@ -1,0 +1,13 @@
+[package]
+name = "blog"
+version = "0.0.0"
+edition = "2024"
+
+[profile.release]
+codegen-units = 1
+debug = true
+lto = "fat"
+opt-level = "z"
+panic = "abort"
+
+[dependencies]
