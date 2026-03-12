@@ -1,0 +1,10 @@
+[tasks.default]
+alias = "dev"
+
+[tasks.dev]
+command = "trunk"
+args = ["serve", "--port", "3000", "--open"]
+
+[tasks.build]
+command = "trunk"
+args = ["build", "--release"]

@@ -1,2 +1,9 @@
-pub mod index;
+pub mod about;
+pub mod blog;
+pub mod home;
+pub mod imprint;
 pub mod not_found;
+pub mod post;
+pub mod privacy;
+pub mod projects;
+pub mod publications;
