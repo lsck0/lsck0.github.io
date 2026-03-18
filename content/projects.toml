@@ -1,0 +1,47 @@
+[[projects]]
+title = "lsck0.github.io"
+description = "This site — a personal blog and portfolio built with Rust, Leptos, and WebAssembly."
+url = "https://github.com/lsck0/lsck0.github.io"
+status = "maintained"
+
+[[projects]]
+title = "plt"
+description = "Notes and experiments on programming language theory, type systems, and formal methods."
+url = "https://github.com/lsck0"
+status = "wip"
+
+[[projects]]
+title = "dotfiles"
+description = "Neovim, tmux, zsh, and Alacritty configs. Nix-managed where possible."
+url = "https://github.com/lsck0/dotfiles"
+status = "maintained"
+
+[[projects]]
+title = ["type-", { scrambled = 8 }]
+description = [{ scrambled = 50 }]
+url = ""
+status = "planned"
+
+[[projects]]
+title = "old-blog"
+description = "Previous iteration of this site, built with Hugo. Replaced by the current Leptos/WASM stack."
+url = ""
+status = "abandoned"
+
+[[projects]]
+title = "haskell-playground"
+description = "Interactive Haskell REPL in the browser with syntax highlighting and basic evaluation."
+url = "https://github.com/lsck0/haskell-playground"
+status = "wip"
+
+[[projects]]
+title = "category-theory-notes"
+description = "Formalized category theory in Agda. Covers functors, natural transformations, and adjunctions."
+url = "https://github.com/lsck0/category-theory-notes"
+status = "maintained"
+
+[[projects]]
+title = "lean-game"
+description = "An interactive proof assistant tutorial for learning dependent type theory through puzzles."
+url = ""
+status = "planned"

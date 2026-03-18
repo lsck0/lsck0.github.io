@@ -1,5 +1,3 @@
-#![allow(clippy::needless_return)]
-
 use leptos::prelude::*;
 use leptos_router::components::A;
 
@@ -11,7 +9,7 @@ pub fn Header() -> impl IntoView {
 
     let toggle_sidebar = move |_| {
         if let Some(state) = sidebar_state {
-            state.mobile_open.update(|open| *open = !*open);
+            state.is_mobile_open.update(|is_open| *is_open = !*is_open);
         }
     };
 
@@ -20,7 +18,7 @@ pub fn Header() -> impl IntoView {
             <button class="sidebar-toggle" on:click=toggle_sidebar title="Menu">
                 {"\u{2630}"}
             </button>
-            <A href="/" attr:class="site-name">
+            <A href="/" attr:class="nav-lambda">
                 {"\u{03bb}"}
             </A>
             <nav class="site-nav">

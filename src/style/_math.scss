@@ -1,0 +1,36 @@
+// ---- Math ----
+
+.math-display {
+  position: relative;
+  overflow-x: auto;
+  margin: 1rem 0;
+  text-align: center;
+}
+
+// ---- KaTeX dark mode ----
+
+[data-theme="dark"] .katex {
+  color: var(--text);
+}
+
+// ---- TikZ ----
+
+.tikz-src {
+  display: none;
+}
+
+.tikz-diagram {
+  position: relative;
+  width: 100%;
+  margin: 2rem 0;
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+
+  .page { overflow: visible !important; }
+  &:hover .math-copy-btn { opacity: 0.6; }
+}
+
+[data-theme="dark"] .tikz-diagram svg {
+  filter: invert(1) hue-rotate(180deg);
+}

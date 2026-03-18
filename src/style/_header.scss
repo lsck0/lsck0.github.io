@@ -1,0 +1,47 @@
+// ---- Site header ----
+
+.site-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+
+  .site-nav {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+    font-size: 0.9rem;
+  }
+
+  .nav-lambda {
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--accent);
+    text-decoration: none;
+    text-shadow: 0 0 12px rgba(var(--glow-rgb), 0.5), 0 0 30px rgba(var(--glow-rgb), 0.2);
+    transition: text-shadow 0.2s ease;
+
+    &:hover {
+      text-decoration: none;
+      text-shadow: 0 0 16px rgba(var(--glow-rgb), 0.7), 0 0 40px rgba(var(--glow-rgb), 0.35);
+    }
+  }
+
+  .sidebar-toggle {
+    display: none;
+    font-family: inherit;
+    font-size: 1.3rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.2rem;
+    line-height: 1;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+}

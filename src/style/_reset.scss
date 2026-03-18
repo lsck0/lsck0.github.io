@@ -1,0 +1,61 @@
+@font-face {
+  font-family: "0xProto";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/0xType/0xProto@2.502/fonts/0xProto-Regular.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "0xProto";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/0xType/0xProto@2.502/fonts/0xProto-Italic.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "0xProto";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/0xType/0xProto@2.502/fonts/0xProto-Bold.woff2")
+    format("woff2");
+}
+
+// ---- Reset ----
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: "0xProto Nerd Font", "0xProto", monospace;
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+body {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}

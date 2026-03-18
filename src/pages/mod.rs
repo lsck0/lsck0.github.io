@@ -1,5 +1,6 @@
 pub mod about;
 pub mod blog;
+pub mod graph;
 pub mod home;
 pub mod imprint;
 pub mod not_found;
@@ -7,3 +8,4 @@ pub mod post;
 pub mod privacy;
 pub mod projects;
 pub mod publications;
+pub mod tos;

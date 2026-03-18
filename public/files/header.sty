@@ -1,0 +1,294 @@
+\NeedsTeXFormat{LaTeX2e}[1994/06/01]
+\ProvidesPackage{header}
+
+% --------------------------------------------------------------------------
+% PACKAGES
+% --------------------------------------------------------------------------
+\usepackage{xparse} % command parsing
+
+% util packages
+\usepackage{xcolor} % text color
+\usepackage{hyperref} % links
+\usepackage[nameinlink]{cleveref} % proper \cref for lemma etc.
+\usepackage{enumerate} % \begin{enumeate}[LABEL]
+\usepackage{csquotes} % quotes \enquote{..}
+\usepackage{ragged2e} % \begin{FlushLeft} \begin{FlushRight} \begin{Center} env
+\usepackage{array} % for table \newcolumntype
+\usepackage{centernot} % better \not -> \centernot
+\usepackage{booktabs} % nicer tables
+\usepackage{wrapfig} % figures within the text
+
+% essential math packages
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{faktor}
+
+% --------------------------------------------------------------------------
+% FEATURE FLAGS
+% --------------------------------------------------------------------------
+\def\useTikz{
+    \usepackage{tikz}
+}
+
+\def\useCommutativeDiagrams{
+    \usepackage{tikz}
+    \usepackage{tikz-cd}
+
+    \newenvironment{diagram}{
+        \begin{center}
+        \begin{tikzcd}
+    }{
+        \end{tikzcd}
+        \end{center}
+    }
+}
+
+\def\useGraphics{
+    \usepackage{graphicx}
+}
+
+\def\usePlots{
+    \usepackage{pgfplots}
+}
+
+% --------------------------------------------------------------------------
+% CONFIGURATION
+% --------------------------------------------------------------------------
+% hyperref link box color
+\hypersetup{
+  colorlinks=false,
+  linkbordercolor=teal,
+}
+
+\newcolumntype{L}{>{$}l<{$}} % math-mode version of "l" column type
+\newcolumntype{C}{>{$}c<{$}}
+\newcolumntype{R}{>{$}r<{$}}
+
+% environments for theorems etc.
+\theoremstyle{definition}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{conjecture}[theorem]{Conjecture}
+
+\crefname{theorem}{Theorem}{Theorems}
+\crefname{lemma}{Lemma}{Lemmata}
+\crefname{corollary}{corollary}{Corollaries}
+\crefname{definition}{Definition}{Definitions}
+\crefname{example}{Example}{Examples}
+\crefname{axiom}{Axiom}{Axioms}
+\crefname{remark}{Remark}{Remarks}
+\crefname{equation}{Equation}{Equations}
+\crefname{conjecture}{Conjecture}{Conjectures}
+\crefname{diagram}{Diagram}{Diagrams}
+
+% --------------------------------------------------------------------------
+% COMMANDS
+% --------------------------------------------------------------------------
+% bold set letters
+\newcommand{\A}{\mathbb{A}}
+\newcommand{\B}{\mathbb{B}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\D}{\mathbb{D}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\G}{\mathbb{G}}
+\renewcommand{\H}{\mathbb{H}}
+\newcommand{\I}{\mathbb{I}}
+\newcommand{\J}{\mathbb{J}}
+\newcommand{\K}{\mathbb{K}}
+\renewcommand{\L}{\mathbb{L}}
+\newcommand{\M}{\mathbb{M}}
+\newcommand{\N}{\mathbb{N}}
+\renewcommand{\O}{\mathbb{O}}
+\renewcommand{\P}{\mathbb{P}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\renewcommand{\S}{\mathbb{S}}
+\newcommand{\T}{\mathbb{T}}
+\newcommand{\U}{\mathbb{U}}
+\newcommand{\V}{\mathbb{V}}
+\newcommand{\W}{\mathbb{W}}
+\newcommand{\X}{\mathbb{X}}
+\newcommand{\Y}{\mathbb{Y}}
+\newcommand{\Z}{\mathbb{Z}}
+
+% calligraphy letters
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cB}{\mathcal{B}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cH}{\mathcal{H}}
+\newcommand{\cI}{\mathcal{I}}
+\newcommand{\cJ}{\mathcal{J}}
+\newcommand{\cK}{\mathcal{K}}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\cN}{\mathcal{N}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\cP}{\mathcal{P}}
+\newcommand{\cQ}{\mathcal{Q}}
+\newcommand{\cR}{\mathcal{R}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cT}{\mathcal{T}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cV}{\mathcal{V}}
+\newcommand{\cW}{\mathcal{W}}
+\newcommand{\cX}{\mathcal{X}}
+\newcommand{\cY}{\mathcal{Y}}
+\newcommand{\cZ}{\mathcal{Z}}
+
+% fraktur letters
+\newcommand{\fA}{\mathfrak{A}}
+\newcommand{\fB}{\mathfrak{B}}
+\newcommand{\fC}{\mathfrak{C}}
+\newcommand{\fD}{\mathfrak{D}}
+\newcommand{\fE}{\mathfrak{E}}
+\newcommand{\fF}{\mathfrak{F}}
+\newcommand{\fG}{\mathfrak{G}}
+\newcommand{\fH}{\mathfrak{H}}
+\newcommand{\fI}{\mathfrak{I}}
+\newcommand{\fJ}{\mathfrak{J}}
+\newcommand{\fK}{\mathfrak{K}}
+\newcommand{\fL}{\mathfrak{L}}
+\newcommand{\fM}{\mathfrak{M}}
+\newcommand{\fN}{\mathfrak{N}}
+\newcommand{\fO}{\mathfrak{O}}
+\newcommand{\fP}{\mathfrak{P}}
+\newcommand{\fQ}{\mathfrak{Q}}
+\newcommand{\fR}{\mathfrak{R}}
+\newcommand{\fS}{\mathfrak{S}}
+\newcommand{\fT}{\mathfrak{T}}
+\newcommand{\fU}{\mathfrak{U}}
+\newcommand{\fV}{\mathfrak{V}}
+\newcommand{\fW}{\mathfrak{W}}
+\newcommand{\fX}{\mathfrak{X}}
+\newcommand{\fY}{\mathfrak{Y}}
+\newcommand{\fZ}{\mathfrak{Z}}
+
+% shortcuts for var variants
+\newcommand{\vphi}{\varphi}
+\newcommand{\vep}{\varepsilon}
+\newcommand{\vth}{\vartheta}
+
+% versions of "constants"
+\newcommand{\ce}{\mathrm{e}}
+\newcommand{\ci}{\mathrm{i}}
+\newcommand{\cd}{\mathrm{d}}
+\newcommand{\dx}{\cd x}
+\newcommand{\dy}{\cd y}
+\newcommand{\dz}{\cd z}
+\newcommand{\dt}{\cd t}
+
+% variable size enclosing symbols
+\newcommand{\Pa}[1]{\left( #1 \right)}
+\newcommand{\Br}[1]{\left[ #1 \right]}
+\newcommand{\Cu}[1]{\left\{ #1 \right\}}
+\newcommand{\Sp}[1]{\left\langle #1 \right\rangle}
+\newcommand{\Abs}[1]{\left\lvert #1 \right\rvert}
+\newcommand{\Norm}[1]{\left\lVert #1 \right\rVert}
+
+% derivatives
+\newcommand{\del}{\partial}
+\DeclareDocumentCommand{\dfrac}{m g}{
+    \IfNoValueTF{#2}{
+        \frac{\cd}{\cd #1}
+    }{
+        \frac{\cd #1}{\cd #2}
+    }
+}
+\DeclareDocumentCommand{\pfrac}{m g}{
+    \IfNoValueTF{#2}{
+        \frac{\del}{\del #1}
+    }{
+        \frac{\del #1}{\del #2}
+    }
+}
+
+% matrices / cases
+\newcommand{\mat}[1]{
+    \begin{pmatrix}
+        #1
+    \end{pmatrix}
+}
+\newcommand{\case}[1]{
+    \begin{cases}
+        #1
+    \end{cases}
+}
+
+% categories
+\newcommand{\Set}{\mathsf{Set}}
+\newcommand{\FinSet}{\mathsf{FinSet}}
+\newcommand{\AbGroup}{\mathsf{AbGroup}}
+\newcommand{\Group}{\mathsf{Group}}
+\newcommand{\Rng}{\mathsf{Rng}}
+\newcommand{\Ring}{\mathsf{Ring}}
+\newcommand{\Field}{\mathsf{Field}}
+\newcommand{\Mod}{\mathsf{Mod}}
+\newcommand{\Vect}{\mathsf{Vect}}
+\newcommand{\Top}{\mathsf{Top}}
+\newcommand{\Mfd}{\mathsf{Mfd}}
+
+% big letter things
+\newcommand{\Alt}{\mathrm{Alt}}
+\newcommand{\Aut}{\mathrm{Aut}}
+\newcommand{\CP}{\C P}
+\newcommand{\End}{\mathrm{End}}
+\newcommand{\Ext}{\mathrm{Ext}}
+\newcommand{\Gal}{\mathrm{Gal}}
+\newcommand{\HP}{\H P}
+\newcommand{\Hom}{\mathrm{Hom}}
+\newcommand{\Int}{\mathrm{Int}}
+\newcommand{\Mat}{\mathrm{Mat}}
+\newcommand{\Mor}{\mathrm{Mor}}
+\newcommand{\RP}{\R P}
+\newcommand{\Sym}{\mathrm{Sym}}
+\newcommand{\TC}{\mathsf{TC}}
+\newcommand{\Tor}{\mathrm{Tor}}
+\newcommand{\Zmod}[1]{\faktor{\Z}{#1\Z}}
+
+% small letter things
+\newcommand{\cat}{\mathsf{cat}}
+\newcommand{\cl}{\mathrm{cl}}
+\newcommand{\codom}{\mathrm{codom}}
+\newcommand{\colim}{\mathrm{colim}}
+\newcommand{\dom}{\mathrm{dom}}
+\newcommand{\id}{\mathrm{id}}
+\newcommand{\im}{\mathrm{im}}
+\newcommand{\inv}[1]{#1^{-1}}
+\newcommand{\pr}{\mathrm{pr}}
+\newcommand{\rk}{\mathrm{rk}}
+\newcommand{\secat}{\mathsf{secat}}
+\newcommand{\skel}[2]{{#1}^{(#2)}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\wgt}{\mathrm{wgt}}
+\newcommand{\zcl}{\mathrm{zcl}}
+
+% util
+\newcommand{\inred}[1]{\textcolor{red}{#1}}
+\newcommand{\inyellow}[1]{\textcolor{yellow}{#1}}
+\newcommand{\inblue}[1]{\textcolor{blue}{#1}}
+\newcommand{\ingreen}[1]{\textcolor{green}{#1}}
+\newcommand{\citationneeded}{\inred{[citation needed]}}
+\newcommand{\referenceneeded}{\inred{[reference needed]}}
+
+\DeclareDocumentCommand{\todo}{g}{
+    \IfNoValueTF{#1}{
+        \inred{todo}
+    }{
+        \inred{todo: #1}
+    }
+}
+
+\endinput

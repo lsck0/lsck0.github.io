@@ -1,42 +1,22 @@
-#![allow(clippy::needless_return)]
-
 use leptos::prelude::*;
 use leptos_meta::*;
 
-use crate::components::layout::Layout;
+use crate::{
+    components::{layout::Layout, render::markdown_to_html},
+    models::meta::META,
+};
+
+const ABOUT_CONTENT: &str = include_str!("../../content/about.md");
 
 #[component]
-pub fn About() -> impl IntoView {
+pub fn AboutPage() -> impl IntoView {
+    let rendered = markdown_to_html(ABOUT_CONTENT);
+
     return view! {
-        <Title text="\u{03bb} lsck0 \u{2014} about" />
+        <Title text=META.page_title("about") />
+        <Meta name="description" content=META.page("about").map(|page| page.description).unwrap_or("") />
         <Layout>
-            <div class="about">
-                <h1>"About"</h1>
-
-                <section>
-                    <p>"Welcome. This is my personal corner of the internet."</p>
-                    <p class="placeholder">"TODO: Write a short introduction about yourself."</p>
-                </section>
-
-                <section>
-                    <h2>"Background"</h2>
-                    <p class="placeholder">
-                        "TODO: Share your background, education, and professional experience."
-                    </p>
-                </section>
-
-                <section>
-                    <h2>"Interests"</h2>
-                    <p class="placeholder">
-                        "TODO: What are you passionate about? List your interests here."
-                    </p>
-                </section>
-
-                <section>
-                    <h2>"Contact"</h2>
-                    <p class="placeholder">"TODO: Add your contact information or social links."</p>
-                </section>
-            </div>
+            <div class="prose-page content" inner_html=rendered.html />
         </Layout>
     };
 }

@@ -1,12 +1,18 @@
-#![allow(clippy::needless_return)]
-
 use std::collections::BTreeMap;
 
 use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_location};
 
 use super::SidebarState;
-use crate::models::post::{POSTS, Post};
+use crate::{
+    components::listing::{ProjectStatus, render_segments, segments_has_scrambled, segments_plain_value},
+    models::post::{POSTS, Post},
+    pages::{projects::PROJECTS, publications::PUBLICATIONS},
+};
+
+// ============================================================
+// Post tree data structures
+// ============================================================
 
 struct TreeNode {
     children: BTreeMap<String, TreeNode>,
@@ -35,6 +41,330 @@ enum TreeItem {
     },
 }
 
+// ============================================================
+// Sidebar component
+// ============================================================
+
+#[component]
+pub fn Sidebar() -> impl IntoView {
+    let state = use_context::<SidebarState>().expect("SidebarState context");
+    let location = use_location();
+
+    let tree = build_post_tree();
+    let items = flatten_tree(&tree, 1, "");
+
+    let close_mobile = move || {
+        state.is_mobile_open.set(false);
+    };
+
+    return view! {
+        <nav class="sidebar" class:open=move || state.is_mobile_open.get()>
+
+            // ============================================================
+            // About
+            // ============================================================
+
+            <A
+                href="/about"
+                attr:class=move || {
+                    let path = location.pathname.get();
+                    if path == "/about" { "sidebar-item active" } else { "sidebar-item" }
+                }
+                on:click=move |_| close_mobile()
+            >
+                "about"
+            </A>
+
+            // ============================================================
+            // Blog
+            // ============================================================
+
+            <div
+                class=move || {
+                    let path = location.pathname.get();
+                    if path.starts_with("/blog") {
+                        "sidebar-item sidebar-section active"
+                    } else {
+                        "sidebar-item sidebar-section"
+                    }
+                }
+                on:click=move |_| {
+                    state.is_blog_open.update(|open| *open = !*open);
+                }
+            >
+                <span class="folder-icon">
+                    {move || if state.is_blog_open.get() { "\u{25be}" } else { "\u{25b8}" }}
+                </span>
+                " blog"
+            </div>
+
+            <ul
+                class="file-tree"
+                style:display=move || if state.is_blog_open.get() { "block" } else { "none" }
+            >
+                {items
+                    .into_iter()
+                    .map(|item| match item {
+                        TreeItem::Folder { name, depth, path } => {
+                            let path_for_click = path.clone();
+                            let path_for_icon = path.clone();
+                            let parent = parent_folder_of(&path);
+
+                            view! {
+                                <li
+                                    class="tree-folder"
+                                    style=move || {
+                                        let padding = format!(
+                                            "padding-left: {}rem",
+                                            depth as f32 * 0.75,
+                                        );
+                                        if is_path_collapsed(&parent, &state.collapsed_folders.get()) {
+                                            format!("{padding}; display: none")
+                                        } else {
+                                            padding
+                                        }
+                                    }
+                                    on:click=move |_| {
+                                        state
+                                            .collapsed_folders
+                                            .update(|set| {
+                                                if !set.remove(&path_for_click) {
+                                                    set.insert(path_for_click.clone());
+                                                }
+                                            });
+                                    }
+                                >
+                                    <span class="folder-icon">
+                                        {move || {
+                                            if state.collapsed_folders.get().contains(&path_for_icon) {
+                                                "\u{25b8}"
+                                            } else {
+                                                "\u{25be}"
+                                            }
+                                        }}
+                                    </span>
+                                    {format!(" {}/", name)}
+                                </li>
+                            }
+                                .into_any()
+                        }
+                        TreeItem::PostEntry { post, depth, parent } => {
+                            let slug = post.slug.to_string();
+                            view! {
+                                <li
+                                    class=move || {
+                                        let path = location.pathname.get();
+                                        let expected = format!("/blog/{}", slug);
+                                        if path == expected {
+                                            "tree-post active"
+                                        } else {
+                                            "tree-post"
+                                        }
+                                    }
+                                    style=move || {
+                                        let padding = format!(
+                                            "padding-left: {}rem",
+                                            depth as f32 * 0.75,
+                                        );
+                                        if is_path_collapsed(&parent, &state.collapsed_folders.get()) {
+                                            format!("{padding}; display: none")
+                                        } else {
+                                            padding
+                                        }
+                                    }
+                                >
+                                    <A
+                                        href=format!("/blog/{}", post.slug)
+                                        on:click=move |_| close_mobile()
+                                    >
+                                        {post.title()}
+                                    </A>
+                                </li>
+                            }
+                                .into_any()
+                        }
+                    })
+                    .collect_view()}
+            </ul>
+
+            // ============================================================
+            // Projects
+            // ============================================================
+
+            <div
+                class=move || {
+                    let path = location.pathname.get();
+                    if path.starts_with("/projects") {
+                        "sidebar-item sidebar-section active"
+                    } else {
+                        "sidebar-item sidebar-section"
+                    }
+                }
+                on:click=move |_| {
+                    state.is_projects_open.update(|open| *open = !*open);
+                }
+            >
+                <span class="folder-icon">
+                    {move || if state.is_projects_open.get() { "\u{25be}" } else { "\u{25b8}" }}
+                </span>
+                " "
+                <A
+                    href="/projects"
+                    on:click=move |event| {
+                        event.stop_propagation();
+                        close_mobile();
+                    }
+                >
+                    "projects"
+                </A>
+            </div>
+
+            <ul
+                class="file-tree"
+                style:display=move || if state.is_projects_open.get() { "block" } else { "none" }
+            >
+                {ProjectStatus::all()
+                    .iter()
+                    .filter(|&&status| PROJECTS.iter().any(|entry| entry.status == status))
+                    .map(|&status| {
+                        let status_id = status.id().to_string();
+                        let status_id_for_click = status_id.clone();
+                        let status_id_for_icon = status_id.clone();
+                        let projects_for_status: Vec<_> = PROJECTS
+                            .iter()
+                            .filter(|entry| entry.status == status)
+                            .collect();
+                        let project_views = projects_for_status
+                            .into_iter()
+                            .map(|entry| {
+                                let current_status_id = status_id.clone();
+                                let title_plain = segments_plain_value(entry.title);
+                                let href = format!("/projects#{}", title_plain);
+                                let label = if segments_has_scrambled(entry.title) {
+                                    view! {
+                                        <span class="teaser">{render_segments(entry.title)}</span>
+                                    }
+                                        .into_any()
+                                } else {
+                                    view! { {title_plain} }.into_any()
+                                };
+                                view! {
+                                    <li
+                                        class="tree-post"
+                                        style:padding-left="1.5rem"
+                                        style:display=move || {
+                                            if state.collapsed_project_groups.get().contains(&current_status_id) {
+                                                "none"
+                                            } else {
+                                                "list-item"
+                                            }
+                                        }
+                                    >
+                                        <A href=href on:click=move |_| close_mobile()>
+                                            {label}
+                                        </A>
+                                    </li>
+                                }
+                            })
+                            .collect_view();
+                        view! {
+                            <li
+                                class="tree-folder"
+                                style="padding-left: 0.75rem"
+                                on:click=move |_| {
+                                    state
+                                        .collapsed_project_groups
+                                        .update(|set| {
+                                            if !set.remove(&status_id_for_click) {
+                                                set.insert(status_id_for_click.clone());
+                                            }
+                                        });
+                                }
+                            >
+                                <span class="folder-icon">
+                                    {move || {
+                                        if state.collapsed_project_groups.get().contains(&status_id_for_icon)
+                                        {
+                                            "\u{25b8}"
+                                        } else {
+                                            "\u{25be}"
+                                        }
+                                    }}
+                                </span>
+                                {format!(" {}/", status.label())}
+                            </li>
+                            {project_views}
+                        }
+                    })
+                    .collect_view()}
+            </ul>
+
+            // ============================================================
+            // Publications
+            // ============================================================
+
+            <div
+                class=move || {
+                    let path = location.pathname.get();
+                    if path.starts_with("/publications") {
+                        "sidebar-item sidebar-section active"
+                    } else {
+                        "sidebar-item sidebar-section"
+                    }
+                }
+                on:click=move |_| {
+                    state.is_publications_open.update(|open| *open = !*open);
+                }
+            >
+                <span class="folder-icon">
+                    {move || if state.is_publications_open.get() { "\u{25be}" } else { "\u{25b8}" }}
+                </span>
+                " "
+                <A
+                    href="/publications"
+                    on:click=move |event| {
+                        event.stop_propagation();
+                        close_mobile();
+                    }
+                >
+                    "publications"
+                </A>
+            </div>
+
+            <ul
+                class="file-tree"
+                style:display=move || if state.is_publications_open.get() { "block" } else { "none" }
+            >
+                {PUBLICATIONS
+                    .iter()
+                    .map(|entry| {
+                        let title_plain = segments_plain_value(entry.title);
+                        let href = format!("/publications#{}", title_plain);
+                        let label = if segments_has_scrambled(entry.title) {
+                            view! { <span class="teaser">{render_segments(entry.title)}</span> }
+                                .into_any()
+                        } else {
+                            view! { {title_plain} }.into_any()
+                        };
+                        view! {
+                            <li class="tree-post" style="padding-left: 0.75rem">
+                                <A href=href on:click=move |_| close_mobile()>
+                                    {label}
+                                </A>
+                            </li>
+                        }
+                    })
+                    .collect_view()}
+            </ul>
+
+        </nav>
+    };
+}
+
+// ============================================================
+// Tree building helpers
+// ============================================================
+
 fn build_post_tree() -> TreeNode {
     let mut root = TreeNode::new();
     for post in POSTS {
@@ -42,8 +372,8 @@ fn build_post_tree() -> TreeNode {
             root.posts.push(post);
         } else {
             let mut node = &mut root;
-            for part in post.folder.split('/') {
-                node = node.children.entry(part.to_string()).or_insert_with(TreeNode::new);
+            for segment in post.folder.split('/') {
+                node = node.children.entry(segment.to_string()).or_insert_with(TreeNode::new);
             }
             node.posts.push(post);
         }
@@ -76,9 +406,9 @@ fn flatten_tree(node: &TreeNode, depth: usize, current_path: &str) -> Vec<TreeIt
     return items;
 }
 
-fn parent_of(path: &str) -> String {
+fn parent_folder_of(path: &str) -> String {
     match path.rfind('/') {
-        Some(pos) => path[..pos].to_string(),
+        Some(separator_position) => path[..separator_position].to_string(),
         None => String::new(),
     }
 }
@@ -88,191 +418,14 @@ fn is_path_collapsed(path: &str, collapsed: &std::collections::BTreeSet<String>)
         return false;
     }
     let mut prefix = String::new();
-    for part in path.split('/') {
+    for segment in path.split('/') {
         if !prefix.is_empty() {
             prefix.push('/');
         }
-        prefix.push_str(part);
+        prefix.push_str(segment);
         if collapsed.contains(&prefix) {
             return true;
         }
     }
     return false;
-}
-
-#[component]
-pub fn Sidebar() -> impl IntoView {
-    let state = use_context::<SidebarState>().expect("SidebarState context");
-    let location = use_location();
-
-    let tree = build_post_tree();
-    let items = flatten_tree(&tree, 1, "");
-
-    let close_mobile = move || {
-        state.mobile_open.set(false);
-    };
-
-    return view! {
-        <nav class="sidebar" class:open=move || state.mobile_open.get()>
-            // About link
-            <A
-                href="/about"
-                attr:class=move || {
-                    let path = location.pathname.get();
-                    if path == "/about" { "sidebar-item active" } else { "sidebar-item" }
-                }
-                on:click=move |_| close_mobile()
-            >
-                "about"
-            </A>
-
-            // Blog section
-            <div
-                class="sidebar-item sidebar-section"
-                on:click=move |_| {
-                    state.blog_open.update(|open| *open = !*open);
-                }
-            >
-                <span class="folder-icon">
-                    {move || if state.blog_open.get() { "\u{25be}" } else { "\u{25b8}" }}
-                </span>
-                " blog"
-            </div>
-
-            <ul
-                class="file-tree"
-                style:display=move || if state.blog_open.get() { "block" } else { "none" }
-            >
-                {items
-                    .into_iter()
-                    .map(|item| match item {
-                        TreeItem::Folder { name, depth, path } => {
-                            let path_click = path.clone();
-                            let path_icon = path.clone();
-                            let parent = parent_of(&path);
-
-                            view! {
-                                <li
-                                    class="tree-folder"
-                                    style=move || {
-                                        let pad = format!(
-                                            "padding-left: {}rem",
-                                            depth as f32 * 0.75,
-                                        );
-                                        if is_path_collapsed(&parent, &state.collapsed.get()) {
-                                            format!("{pad}; display: none")
-                                        } else {
-                                            pad
-                                        }
-                                    }
-                                    on:click=move |_| {
-                                        state
-                                            .collapsed
-                                            .update(|s| {
-                                                if !s.remove(&path_click) {
-                                                    s.insert(path_click.clone());
-                                                }
-                                            });
-                                    }
-                                >
-                                    <span class="folder-icon">
-                                        {move || {
-                                            if state.collapsed.get().contains(&path_icon) {
-                                                "\u{25b8}"
-                                            } else {
-                                                "\u{25be}"
-                                            }
-                                        }}
-                                    </span>
-                                    {format!(" {}/", name)}
-                                </li>
-                            }
-                                .into_any()
-                        }
-                        TreeItem::PostEntry { post, depth, parent } => {
-                            let slug = post.slug.to_string();
-                            view! {
-                                <li
-                                    class=move || {
-                                        let path = location.pathname.get();
-                                        let expected = format!("/blog/{}", slug);
-                                        if path == expected {
-                                            "tree-post active"
-                                        } else {
-                                            "tree-post"
-                                        }
-                                    }
-                                    style=move || {
-                                        let pad = format!(
-                                            "padding-left: {}rem",
-                                            depth as f32 * 0.75,
-                                        );
-                                        if is_path_collapsed(&parent, &state.collapsed.get()) {
-                                            format!("{pad}; display: none")
-                                        } else {
-                                            pad
-                                        }
-                                    }
-                                >
-                                    <A
-                                        href=format!("/blog/{}", post.slug)
-                                        on:click=move |_| close_mobile()
-                                    >
-                                        {post.title()}
-                                    </A>
-                                </li>
-                            }
-                                .into_any()
-                        }
-                    })
-                    .collect_view()}
-            </ul>
-
-            // Projects link
-            <A
-                href="/projects"
-                attr:class=move || {
-                    let path = location.pathname.get();
-                    if path == "/projects" { "sidebar-item active" } else { "sidebar-item" }
-                }
-                on:click=move |_| close_mobile()
-            >
-                "projects"
-            </A>
-
-            // Publications link
-            <A
-                href="/publications"
-                attr:class=move || {
-                    let path = location.pathname.get();
-                    if path == "/publications" { "sidebar-item active" } else { "sidebar-item" }
-                }
-                on:click=move |_| close_mobile()
-            >
-                "publications"
-            </A>
-
-            // Legal links
-            <A
-                href="/imprint"
-                attr:class=move || {
-                    let path = location.pathname.get();
-                    if path == "/imprint" { "sidebar-item active" } else { "sidebar-item" }
-                }
-                on:click=move |_| close_mobile()
-            >
-                "imprint"
-            </A>
-            <A
-                href="/privacy"
-                attr:class=move || {
-                    let path = location.pathname.get();
-                    if path == "/privacy" { "sidebar-item active" } else { "sidebar-item" }
-                }
-                on:click=move |_| close_mobile()
-            >
-                "privacy"
-            </A>
-        </nav>
-    };
 }

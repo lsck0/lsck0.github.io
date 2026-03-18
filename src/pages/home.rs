@@ -1,5 +1,3 @@
-#![allow(clippy::needless_return)]
-
 use std::{cell::RefCell, f64::consts::PI, rc::Rc, time::Duration};
 
 use leptos::prelude::*;
@@ -8,28 +6,35 @@ use leptos_router::components::A;
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
-use crate::components::footer::Footer;
+use crate::{components::footer::Footer, models::meta::META};
 
-const MESSAGES: &[&str] = &[
-    "welcome to my homepage",
-    "i am a mathematician and software engineer",
-    "check out my projects and publications",
-];
+const HOME_CONTENT: &str = include_str!("../../content/home.md");
 
-const TYPE_SPEED: u64 = 80;
-const DELETE_SPEED: u64 = 40;
-const PAUSE_TIME: u64 = 2000;
+fn messages() -> Vec<&'static str> {
+    return HOME_CONTENT.lines().filter(|line| !line.is_empty()).collect();
+}
+
+const TYPE_SPEED: u64 = 65;
+const DELETE_SPEED: u64 = 35;
+const PAUSE_TIME: u64 = 2400;
+
+// ============================================================
+// Component
+// ============================================================
 
 #[component]
-pub fn Home() -> impl IntoView {
+pub fn HomePage() -> impl IntoView {
     let (display_text, set_display_text) = signal(String::new());
-
-    // Particle animation
     let anim_running = RwSignal::new(true);
-    // Terminal typing effect
     let typing_running = RwSignal::new(true);
+    let anim_initialized = std::cell::Cell::new(false);
 
     Effect::new(move |_: Option<()>| {
+        if anim_initialized.get() {
+            return;
+        }
+        anim_initialized.set(true);
+
         anim_running.set(true);
         request_animation_frame(move || {
             if let Some(el) = document().get_element_by_id("simplicial-bg")
@@ -62,15 +67,21 @@ pub fn Home() -> impl IntoView {
                 return;
             }
 
-            let current_msg = MESSAGES[msg_index.get_value()];
+            let msgs = messages();
+            if msgs.is_empty() {
+                return;
+            }
+            let current_msg = msgs[msg_index.get_value() % msgs.len()];
+            let char_count = current_msg.chars().count();
 
             if is_deleting.get_value() {
-                let ci = char_index.get_value().saturating_sub(1);
-                char_index.set_value(ci);
-                set_display_text.set(current_msg[..ci].to_string());
-                if ci == 0 {
+                let current_char = char_index.get_value().saturating_sub(1);
+                char_index.set_value(current_char);
+                let text: String = current_msg.chars().take(current_char).collect();
+                set_display_text.set(text);
+                if current_char == 0 {
                     is_deleting.set_value(false);
-                    msg_index.set_value((msg_index.get_value() + 1) % MESSAGES.len());
+                    msg_index.set_value((msg_index.get_value() + 1) % msgs.len());
                     set_timeout(
                         move || schedule_tick(running, msg_index, char_index, is_deleting, set_display_text),
                         Duration::from_millis(TYPE_SPEED),
@@ -82,10 +93,11 @@ pub fn Home() -> impl IntoView {
                     );
                 }
             } else {
-                let ci = char_index.get_value() + 1;
-                char_index.set_value(ci);
-                set_display_text.set(current_msg[..ci].to_string());
-                if ci >= current_msg.len() {
+                let current_char = char_index.get_value() + 1;
+                char_index.set_value(current_char);
+                let text: String = current_msg.chars().take(current_char).collect();
+                set_display_text.set(text);
+                if current_char >= char_count {
                     is_deleting.set_value(true);
                     set_timeout(
                         move || schedule_tick(running, msg_index, char_index, is_deleting, set_display_text),
@@ -104,31 +116,47 @@ pub fn Home() -> impl IntoView {
     });
 
     return view! {
-        <Title text="\u{03bb} lsck0" />
+        <Title text=META.page_title("home") />
+        <Meta name="description" content=META.page("home").map(|page| page.description).unwrap_or("") />
         <canvas id="simplicial-bg" class="simplicial-bg"></canvas>
         <main class="home">
             <div class="home-content">
-                <h1 class="home-logo">
-                    {"\u{03bb}"} <span class="home-handle">" Luca Sandrock"</span>
-                </h1>
-                <div class="terminal-line">
-                    <span class="terminal-prompt">">"</span>
-                    <span class="terminal-text">{display_text}</span>
-                    <span class="terminal-cursor">"\u{2588}"</span>
+                <div class="home-hero">
+                    <div class="home-lambda">{"\u{03bb}"}</div>
+                    <h1 class="home-title">"/dev/lsck0"</h1>
+                    <div class="home-subtitle">"mathematician and software engineer"</div>
                 </div>
+
+                <div class="terminal-line">
+                    <span class="terminal-prompt">{"\u{276f}"}</span>
+                    <span class="terminal-text">{display_text}</span>
+                    <span class="terminal-cursor">{"\u{258f}"}</span>
+                </div>
+
                 <nav class="home-links">
-                    <A href="/about">"about"</A>
-                    <A href="/blog">"blog"</A>
-                    <A href="/projects">"projects"</A>
-                    <A href="/publications">"publications"</A>
+                    <A href="/about" attr:class="home-link">
+                        "about"
+                    </A>
+                    <A href="/blog" attr:class="home-link">
+                        "blog"
+                    </A>
+                    <A href="/projects" attr:class="home-link">
+                        "projects"
+                    </A>
+                    <A href="/publications" attr:class="home-link">
+                        "publications"
+                    </A>
                 </nav>
+
             </div>
         </main>
         <Footer />
     };
 }
 
-// ---- Particle background animation ----
+// ============================================================
+// Particle background animation
+// ============================================================
 
 type AnimationCallback = Rc<RefCell<Option<Closure<dyn FnMut()>>>>;
 
@@ -143,129 +171,153 @@ struct Particle {
     vy: f64,
 }
 
-fn particle_distance(a: &Particle, b: &Particle) -> f64 {
-    let dx = a.x - b.x;
-    let dy = a.y - b.y;
-    (dx * dx + dy * dy).sqrt()
+fn particle_distance(first: &Particle, second: &Particle) -> f64 {
+    let dx = first.x - second.x;
+    let dy = first.y - second.y;
+    return (dx * dx + dy * dy).sqrt();
 }
 
 fn accent_rgb() -> &'static str {
-    let dark = web_sys::window()
-        .and_then(|w| w.document())
-        .and_then(|d| d.document_element())
-        .and_then(|e| e.get_attribute("data-theme"))
-        .is_some_and(|t| t == "dark");
-    if dark { "121, 184, 255" } else { "74, 144, 217" }
+    let is_dark_theme = web_sys::window()
+        .and_then(|window| window.document())
+        .and_then(|document| document.document_element())
+        .and_then(|element| element.get_attribute("data-theme"))
+        .is_some_and(|theme| theme == "dark");
+    if is_dark_theme { "121, 184, 255" } else { "74, 144, 217" }
 }
 
 fn run_particle_bg(canvas: HtmlCanvasElement, running: RwSignal<bool>) {
     let ctx: CanvasRenderingContext2d = canvas.get_context("2d").unwrap().unwrap().dyn_into().unwrap();
 
-    let w = canvas.offset_width().max(1) as u32;
-    let h = canvas.offset_height().max(1) as u32;
-    canvas.set_width(w);
-    canvas.set_height(h);
+    let width = canvas.offset_width().max(1) as u32;
+    let height = canvas.offset_height().max(1) as u32;
+    canvas.set_width(width);
+    canvas.set_height(height);
 
-    let area = (w as f64) * (h as f64);
-    let num = ((area / 18000.0).round() as usize).max(15);
+    let area = (width as f64) * (height as f64);
+    let particle_count = ((area / 14000.0).round() as usize).max(15);
 
-    let mut particles = Vec::with_capacity(num);
-    for _ in 0..num {
+    let mut particles = Vec::with_capacity(particle_count);
+    for _ in 0..particle_count {
         particles.push(Particle {
-            x: js_sys::Math::random() * w as f64,
-            y: js_sys::Math::random() * h as f64,
+            x: js_sys::Math::random() * width as f64,
+            y: js_sys::Math::random() * height as f64,
             vx: (js_sys::Math::random() - 0.5) * SPEED,
             vy: (js_sys::Math::random() - 0.5) * SPEED,
         });
     }
 
-    let state = Rc::new(RefCell::new(particles));
+    let particle_state = Rc::new(RefCell::new(particles));
+    let previous_size = Rc::new(RefCell::new((width as f64, height as f64)));
 
-    let f: AnimationCallback = Rc::new(RefCell::new(None));
-    let g = f.clone();
+    let animation_closure: AnimationCallback = Rc::new(RefCell::new(None));
+    let animation_handle = animation_closure.clone();
 
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+    *animation_handle.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         if !running.get_untracked() {
             return;
         }
 
-        let cw = canvas.offset_width().max(1) as f64;
-        let ch = canvas.offset_height().max(1) as f64;
-        if canvas.width() != cw as u32 || canvas.height() != ch as u32 {
-            canvas.set_width(cw as u32);
-            canvas.set_height(ch as u32);
+        let canvas_width = canvas.offset_width().max(1) as f64;
+        let canvas_height = canvas.offset_height().max(1) as f64;
+        if canvas.width() != canvas_width as u32 || canvas.height() != canvas_height as u32 {
+            canvas.set_width(canvas_width as u32);
+            canvas.set_height(canvas_height as u32);
+
+            let (old_width, old_height) = *previous_size.borrow();
+            let mut particles = particle_state.borrow_mut();
+
+            if old_width > 0.0 && old_height > 0.0 {
+                let scale_x = canvas_width / old_width;
+                let scale_y = canvas_height / old_height;
+                for particle in particles.iter_mut() {
+                    particle.x *= scale_x;
+                    particle.y *= scale_y;
+                }
+            }
+
+            let target_count = ((canvas_width * canvas_height / 14000.0).round() as usize).max(15);
+            while particles.len() > target_count {
+                particles.pop();
+            }
+            while particles.len() < target_count {
+                particles.push(Particle {
+                    x: js_sys::Math::random() * canvas_width,
+                    y: js_sys::Math::random() * canvas_height,
+                    vx: (js_sys::Math::random() - 0.5) * SPEED,
+                    vy: (js_sys::Math::random() - 0.5) * SPEED,
+                });
+            }
+
+            drop(particles);
+            *previous_size.borrow_mut() = (canvas_width, canvas_height);
         }
 
         let rgb = accent_rgb();
-        let mut pts = state.borrow_mut();
+        let mut particles = particle_state.borrow_mut();
 
-        for p in pts.iter_mut() {
-            p.x += p.vx;
-            p.y += p.vy;
-            if p.x < 0.0 || p.x > cw {
-                p.vx *= -1.0;
+        for particle in particles.iter_mut() {
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            if particle.x < 0.0 || particle.x > canvas_width {
+                particle.vx *= -1.0;
             }
-            if p.y < 0.0 || p.y > ch {
-                p.vy *= -1.0;
+            if particle.y < 0.0 || particle.y > canvas_height {
+                particle.vy *= -1.0;
             }
-            p.x = p.x.clamp(0.0, cw);
-            p.y = p.y.clamp(0.0, ch);
+            particle.x = particle.x.clamp(0.0, canvas_width);
+            particle.y = particle.y.clamp(0.0, canvas_height);
         }
 
-        ctx.clear_rect(0.0, 0.0, cw, ch);
+        ctx.clear_rect(0.0, 0.0, canvas_width, canvas_height);
 
-        // 2-simplices (filled triangles)
-        for i in 0..pts.len() {
-            for j in (i + 1)..pts.len() {
-                let dij = particle_distance(&pts[i], &pts[j]);
-                if dij > TRI_DIST {
+        for i in 0..particles.len() {
+            for j in (i + 1)..particles.len() {
+                let dist_ij = particle_distance(&particles[i], &particles[j]);
+                if dist_ij > TRI_DIST {
                     continue;
                 }
-                for k in (j + 1)..pts.len() {
-                    let dik = particle_distance(&pts[i], &pts[k]);
-                    if dik > TRI_DIST {
+                for k in (j + 1)..particles.len() {
+                    let dist_ik = particle_distance(&particles[i], &particles[k]);
+                    if dist_ik > TRI_DIST {
                         continue;
                     }
-                    let djk = particle_distance(&pts[j], &pts[k]);
-                    if djk > TRI_DIST {
+                    let dist_jk = particle_distance(&particles[j], &particles[k]);
+                    if dist_jk > TRI_DIST {
                         continue;
                     }
-                    let max_d = dij.max(dik).max(djk);
-                    let alpha = 0.12 * (1.0 - max_d / TRI_DIST);
+                    let max_dist = dist_ij.max(dist_ik).max(dist_jk);
+                    let alpha = 0.12 * (1.0 - max_dist / TRI_DIST);
                     ctx.begin_path();
-                    ctx.move_to(pts[i].x, pts[i].y);
-                    ctx.line_to(pts[j].x, pts[j].y);
-                    ctx.line_to(pts[k].x, pts[k].y);
+                    ctx.move_to(particles[i].x, particles[i].y);
+                    ctx.line_to(particles[j].x, particles[j].y);
+                    ctx.line_to(particles[k].x, particles[k].y);
                     ctx.close_path();
-                    let s = format!("rgba({rgb}, {alpha})");
-                    ctx.set_fill_style_str(&s);
+                    ctx.set_fill_style_str(&format!("rgba({rgb}, {alpha})"));
                     ctx.fill();
                 }
             }
         }
 
-        // 1-simplices (edges)
         ctx.set_line_width(1.2);
-        for i in 0..pts.len() {
-            for j in (i + 1)..pts.len() {
-                let d = particle_distance(&pts[i], &pts[j]);
-                if d < EDGE_DIST {
-                    let alpha = 0.3 * (1.0 - d / EDGE_DIST);
+        for i in 0..particles.len() {
+            for j in (i + 1)..particles.len() {
+                let dist = particle_distance(&particles[i], &particles[j]);
+                if dist < EDGE_DIST {
+                    let alpha = 0.3 * (1.0 - dist / EDGE_DIST);
                     ctx.begin_path();
-                    ctx.move_to(pts[i].x, pts[i].y);
-                    ctx.line_to(pts[j].x, pts[j].y);
-                    let s = format!("rgba({rgb}, {alpha})");
-                    ctx.set_stroke_style_str(&s);
+                    ctx.move_to(particles[i].x, particles[i].y);
+                    ctx.line_to(particles[j].x, particles[j].y);
+                    ctx.set_stroke_style_str(&format!("rgba({rgb}, {alpha})"));
                     ctx.stroke();
                 }
             }
         }
 
-        // 0-simplices (vertices)
-        let neighbor_counts: Vec<usize> = (0..pts.len())
+        let neighbor_counts: Vec<usize> = (0..particles.len())
             .map(|i| {
-                (0..pts.len())
-                    .filter(|&j| j != i && particle_distance(&pts[i], &pts[j]) < EDGE_DIST)
+                (0..particles.len())
+                    .filter(|&j| j != i && particle_distance(&particles[i], &particles[j]) < EDGE_DIST)
                     .count()
             })
             .collect();
@@ -273,20 +325,20 @@ fn run_particle_bg(canvas: HtmlCanvasElement, running: RwSignal<bool>) {
         for (i, &count) in neighbor_counts.iter().enumerate() {
             let alpha = 0.15 + 0.08 * (count.min(5) as f64);
             ctx.begin_path();
-            let _ = ctx.arc(pts[i].x, pts[i].y, 2.0, 0.0, PI * 2.0);
-            let s = format!("rgba({rgb}, {alpha})");
-            ctx.set_fill_style_str(&s);
+            let _ = ctx.arc(particles[i].x, particles[i].y, 2.0, 0.0, PI * 2.0);
+            ctx.set_fill_style_str(&format!("rgba({rgb}, {alpha})"));
             ctx.fill();
         }
 
-        drop(pts);
+        drop(particles);
 
         if let Some(window) = web_sys::window() {
-            let _ = window.request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref());
+            let _ =
+                window.request_animation_frame(animation_closure.borrow().as_ref().unwrap().as_ref().unchecked_ref());
         }
     }) as Box<dyn FnMut()>));
 
     if let Some(window) = web_sys::window() {
-        let _ = window.request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref());
+        let _ = window.request_animation_frame(animation_handle.borrow().as_ref().unwrap().as_ref().unchecked_ref());
     }
 }

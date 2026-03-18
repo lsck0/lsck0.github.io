@@ -25,17 +25,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+
+      - name: Install mold linker
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - uses: cargo-bins/cargo-binstall@main
 
-      - name: Install Trunk
-        run: cargo binstall trunk -y
+      - name: Install tools
+        run: cargo binstall trunk cargo-make wasm-opt -y
 
       - name: Build
-        run: trunk build --release --public-url "/"
-
-      - name: Copy 404.html for SPA routing
-        run: cp dist/index.html dist/404.html
+        run: makers build
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,0 +1,64 @@
+// ---- Theme custom properties ----
+
+:root,
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-alt: #f6f8fa;
+  --text: #24292e;
+  --text-muted: #6a737d;
+  --border: #e1e4e8;
+  --accent: #4a90d9;
+  --accent-hover: #3a7bc8;
+  --code-bg: #f6f8fa;
+  --tag-text: #4a90d9;
+  --tag-exclude-text: #cb2431;
+  --sidebar-active: #4a90d9;
+  --glow-rgb: 74, 144, 217;
+
+  --callout-tip: #1a7f37;
+  --callout-warning: #9a6700;
+  --callout-danger: #cf222e;
+  --callout-info: #0969da;
+  --series-edge: #9a6700;
+
+  --code-comment: #6a737d;
+  --code-keyword: #d73a49;
+  --code-string: #032f62;
+  --code-function: #6f42c1;
+  --code-number: #005cc5;
+  --code-operator: #d73a49;
+  --code-punctuation: #24292e;
+  --code-class: #6f42c1;
+  --code-builtin: #005cc5;
+}
+
+[data-theme="dark"] {
+  --bg: #080c12;
+  --bg-alt: #111820;
+  --text: #c9d1d9;
+  --text-muted: #8b949e;
+  --border: #30363d;
+  --accent: #79b8ff;
+  --accent-hover: #a5d6ff;
+  --code-bg: #111820;
+  --tag-text: #79b8ff;
+  --tag-exclude-text: #f85149;
+  --sidebar-active: #79b8ff;
+  --glow-rgb: 121, 184, 255;
+
+  --callout-tip: #3fb950;
+  --callout-warning: #d29922;
+  --callout-danger: #f85149;
+  --callout-info: #58a6ff;
+  --series-edge: #e5c07b;
+
+  --code-comment: #8b949e;
+  --code-keyword: #ff7b72;
+  --code-string: #a5d6ff;
+  --code-function: #d2a8ff;
+  --code-number: #79c0ff;
+  --code-operator: #ff7b72;
+  --code-punctuation: #c9d1d9;
+  --code-class: #f0883e;
+  --code-builtin: #79c0ff;
+}

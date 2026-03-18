@@ -1,0 +1,393 @@
+// ---- Blog page ----
+
+.blog-page {
+  width: 100%;
+}
+
+// ---- Toolbar ----
+
+.blog-toolbar {
+  margin-bottom: 1.5rem;
+}
+
+.blog-toolbar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.blog-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  padding-bottom: 0.35rem;
+  transition: border-color 0.2s ease;
+
+  &:focus-within {
+    border-color: var(--accent);
+  }
+
+  input {
+    flex: 1;
+    padding: 0.3rem 0;
+    font-family: inherit;
+    font-size: 0.85rem;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    letter-spacing: 0.02em;
+
+    &::placeholder {
+      color: var(--text-muted);
+      opacity: 0.4;
+    }
+  }
+}
+
+.blog-count {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.blog-views {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.25rem 0;
+}
+
+.view-toggle {
+  font-family: inherit;
+  font-size: 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.45rem;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, color 0.15s ease;
+
+  &:hover { opacity: 1; color: var(--text); }
+  &.active { opacity: 1; color: var(--accent); }
+}
+
+// ---- Tag filters ----
+
+.blog-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.tag {
+  font-size: 0.7rem;
+  font-family: inherit;
+  padding: 0.1rem 0.35rem;
+  border: none;
+  background: none;
+  color: var(--tag-text);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, color 0.15s ease;
+
+  &:hover { opacity: 1; color: var(--accent-hover); }
+  &.include { opacity: 1; color: var(--accent); text-decoration: underline; }
+  &.exclude { opacity: 1; color: var(--tag-exclude-text); text-decoration: line-through; }
+
+  &.reset {
+    color: var(--text-muted);
+    border: 1px dashed var(--text-muted);
+    padding: 0.1rem 0.4rem;
+    margin-left: 0.15rem;
+    opacity: 0.8;
+
+    &:hover { opacity: 1; color: var(--text); border-color: var(--text); }
+  }
+}
+
+// ---- Read badge ----
+
+.read-badge {
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  margin-left: auto;
+
+  &.read {
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  &.unread {
+    color: var(--accent);
+    opacity: 0.7;
+  }
+}
+
+// ---- List view ----
+
+.post-list {
+  list-style: none;
+}
+
+.post-card {
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+
+  &:first-child { padding-top: 0; }
+}
+
+.post-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.post-bookmark-btn {
+  flex-shrink: 0;
+  width: 0.55rem;
+  height: 0.8rem;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 70%, 0 100%);
+  background: var(--border);
+  opacity: 0.3;
+  transition: opacity 0.15s ease, background 0.15s ease;
+
+  &:hover { opacity: 0.7; }
+  &.active {
+    background: var(--accent);
+    opacity: 1;
+  }
+}
+
+.post-title-link {
+  color: var(--text);
+  text-decoration: none;
+
+  &:hover { color: var(--accent); }
+}
+
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-top: 0.15rem;
+  margin-left: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.post-date {
+  flex-shrink: 0;
+}
+
+.post-series {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+.post-tags {
+  color: var(--tag-text);
+  font-size: 0.7rem;
+}
+
+.post-card-desc {
+  margin-top: 0.2rem;
+  margin-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+// ---- Empty state ----
+
+.blog-empty {
+  padding: 2rem 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+// ---- Pagination ----
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding-top: 1rem;
+
+  .page-btn {
+    font-family: inherit;
+    font-size: 0.85rem;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem 0.6rem;
+
+    &:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    &:disabled { opacity: 0.4; cursor: default; }
+  }
+
+  .page-info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+}
+
+// ---- Tree view ----
+
+.blog-tree-view {
+  margin-top: 0.25rem;
+}
+
+.tree-section {
+  margin-bottom: 0.25rem;
+}
+
+.tree-folder-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+
+  &:hover { color: var(--accent); }
+}
+
+.tree-icon {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  width: 0.7em;
+  flex-shrink: 0;
+}
+
+.tree-folder-name {
+  color: var(--text-muted);
+}
+
+.tree-folder-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.tree-children {
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+  margin-left: 0.3rem;
+}
+
+.tree-file {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.85rem;
+}
+
+.tree-file-link {
+  color: var(--text);
+  text-decoration: none;
+
+  &:hover { color: var(--accent); }
+}
+
+.tree-file-meta {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+// ---- Series view ----
+
+.blog-series-view {
+  margin-top: 0.25rem;
+}
+
+.series-section {
+  margin-bottom: 0.5rem;
+}
+
+.series-header-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+
+  &:hover { color: var(--accent); }
+  &.standalone { cursor: default; }
+}
+
+.series-name {
+  color: var(--text);
+}
+
+.series-progress {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.series-entries {
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+  margin-left: 0.3rem;
+}
+
+.series-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.85rem;
+}
+
+.series-num {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  min-width: 1.5em;
+}
+
+.series-link {
+  color: var(--text);
+  text-decoration: none;
+
+  &:hover { color: var(--accent); }
+}
+
+// ---- Graph view ----
+
+.blog-graph-view {
+  margin-top: 0.25rem;
+}

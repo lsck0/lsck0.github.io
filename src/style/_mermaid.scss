@@ -1,0 +1,10 @@
+// ---- Mermaid ----
+
+.mermaid {
+  position: relative;
+  text-align: center;
+  margin: 2rem auto;
+  min-width: 60%;
+
+  &:hover .math-copy-btn { opacity: 0.6; }
+}

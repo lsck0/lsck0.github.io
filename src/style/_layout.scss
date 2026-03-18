@@ -1,0 +1,25 @@
+// ---- Page layout (sidebar + content) ----
+
+.marquee-container {
+  background: var(--callout-warning);
+  color: var(--bg);
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+
+  marquee {
+    padding: 0.25rem 0;
+  }
+}
+
+.page-layout {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  flex: 1;
+
+  > main {
+    flex: 1;
+    min-width: 0;
+  }
+}

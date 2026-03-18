@@ -1,0 +1,144 @@
+// ---- Responsive ----
+
+@media (max-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    padding: 1rem 0.75rem;
+  }
+
+  // Header: show nav links, add hamburger for sidebar
+  .site-header {
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+
+    .sidebar-toggle {
+      display: block;
+    }
+
+    .site-nav {
+      gap: 0.6rem;
+      font-size: 0.8rem;
+      flex-wrap: wrap;
+    }
+  }
+
+  // Home
+  .home {
+    .home-logo {
+      font-size: 3rem;
+    }
+  }
+
+  // Page layout: stack sidebar above content
+  .page-layout {
+    flex-direction: column;
+
+    > main {
+      width: 100%;
+    }
+  }
+
+  .sidebar {
+    display: none;
+    width: 100%;
+    position: static;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1.5rem;
+
+    &.open {
+      display: block;
+    }
+  }
+
+  // Tag buttons: bigger touch targets
+  .tag {
+    padding: 0.15rem 0;
+    font-size: 0.8rem;
+  }
+
+  .tag.reset {
+    padding: 0.25rem 0.6rem;
+  }
+
+  // Blog page
+  .blog-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .post-card-meta {
+    margin-left: 0;
+    margin-top: 0.3rem;
+  }
+
+  .post-card-desc {
+    margin-left: 0;
+  }
+
+  .tree-file {
+    flex-wrap: wrap;
+  }
+
+  .tree-file-tags {
+    width: 100%;
+    padding-left: 1.4rem;
+  }
+
+  // Post title
+  .post-title {
+    font-size: 1.3rem;
+  }
+
+  // Content: prevent overflow
+  .content {
+    pre {
+      padding: 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  // Math overflow
+  .math-display {
+    font-size: 0.9em;
+  }
+
+  // Mermaid overflow
+  .mermaid {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  // TikZ overflow
+  .tikz-diagram {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  // Footer
+  .site-footer {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  // Labeled blocks
+  .labeled-block {
+    padding: 0.5rem 0;
+    border-left: none;
+  }
+
+  // Xref tooltips
+  .xref-tooltip {
+    max-width: calc(100vw - 32px);
+  }
+}

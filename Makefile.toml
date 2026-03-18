@@ -2,9 +2,44 @@
 alias = "dev"
 
 [tasks.dev]
-command = "trunk"
-args = ["serve", "--port", "3000", "--open"]
+description = "Start trunk dev server"
+workspace = false
+script = ["trunk serve --port 3000 --open"]
+
+# Optimize the WASM binary with wasm-opt (Trunk's built-in wasm-opt doesn't
+# pass the feature flags that Rust nightly requires, so we run it ourselves).
+[tasks.wasm-opt]
+description = "Run wasm-opt with correct feature flags"
+workspace = false
+script = [
+    '''
+    WASM_FILE=$(ls dist/*_bg.wasm 2>/dev/null | head -1)
+    if [ -n "$WASM_FILE" ]; then
+        wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int -o "$WASM_FILE.opt" "$WASM_FILE"
+        mv "$WASM_FILE.opt" "$WASM_FILE"
+        echo "wasm-opt: optimized $WASM_FILE"
+    fi
+    '''
+]
 
 [tasks.build]
-command = "trunk"
-args = ["build", "--release"]
+description = "Build the site for production"
+clear = true
+workspace = false
+script = [
+    "trunk clean",
+    "trunk build --release",
+    "makers wasm-opt",
+    "cargo run --release --package indexer",
+    "cp dist/index.html dist/404.html",
+]
+
+[tasks.ci]
+description = "Run checks and build"
+clear = true
+workspace = false
+script = [
+    "cargo clippy --target wasm32-unknown-unknown -- -D warnings",
+    "cargo fmt -- --check",
+    "makers build",
+]

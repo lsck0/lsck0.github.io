@@ -1,0 +1,29 @@
+[site]
+title = "/dev/lsck0"
+description = "computer science, mathematics, and software engineering"
+author = "Luca Sandrock"
+url = "https://lsck0.github.io"
+
+[pages.home]
+title = "/dev/lsck0"
+description = "Personal knowledge base — computer science, mathematics, and software engineering."
+
+[pages.about]
+title = "about"
+description = "About Luca Sandrock"
+
+[pages.blog]
+title = "blog"
+description = "Posts on CS, math, and engineering."
+
+[pages.projects]
+title = "projects"
+description = "Software projects and open source work."
+
+[pages.publications]
+title = "publications"
+description = "Academic publications and research."
+
+[pages.graph]
+title = "knowledge graph"
+description = "Interactive graph of all posts and their connections."

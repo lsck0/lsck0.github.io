@@ -1,0 +1,120 @@
+.simplicial-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+
+// ---- Home page ----
+
+.home {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  position: relative;
+
+  .home-content {
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    animation: home-fade-in 0.6s ease-out;
+  }
+}
+
+@keyframes home-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+// ---- Hero section ----
+
+.home-hero {
+  margin-bottom: 2rem;
+}
+
+.home-lambda {
+  font-size: 5rem;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
+  animation: home-lambda-in 0.8s ease-out;
+  text-shadow: 0 0 30px rgba(var(--glow-rgb), 0.4), 0 0 60px rgba(var(--glow-rgb), 0.15);
+}
+
+@keyframes home-lambda-in {
+  from { opacity: 0; transform: scale(0.8) translateY(-8px); }
+  to   { opacity: 0.9; transform: scale(1) translateY(0); }
+}
+
+.home-title {
+  font-size: 1.6rem;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.25rem;
+  text-shadow: 0 0 20px rgba(var(--glow-rgb), 0.25);
+}
+
+.home-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+// ---- Terminal typing ----
+
+.terminal-line {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 2.5rem;
+  min-height: 1.7em;
+
+  .terminal-prompt {
+    color: var(--accent);
+    margin-right: 0.4rem;
+  }
+
+  .terminal-cursor {
+    animation: blink 1s step-end infinite;
+    color: var(--accent);
+  }
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+// ---- Navigation ----
+
+.home-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  margin-bottom: 2.5rem;
+}
+
+.home-link {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+}
+
+// ---- Responsive ----
+
+@media (max-width: 600px) {
+  .home-lambda { font-size: 3.5rem; }
+  .home-title { font-size: 1.2rem; }
+  .home-subtitle { font-size: 0.65rem; letter-spacing: 0.2em; }
+}

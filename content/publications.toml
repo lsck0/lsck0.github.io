@@ -1,0 +1,41 @@
+[[publications]]
+title = "cs"
+description = "Sample entry — replace with actual publication details, venue, and year."
+url = "https://arxiv.org"
+authors = "L. Sandrock, A. Coauthor"
+date = "2026"
+
+[[publications]]
+title = "math"
+description = "On the structure of \\(\\mathbb{Z}[i]\\) as a Euclidean domain — sample entry."
+url = "https://arxiv.org"
+authors = "L. Sandrock, B. Coauthor"
+date = "2025"
+
+[[publications]]
+title = [{ scrambled = 30 }]
+description = [{ scrambled = 60 }]
+url = ""
+authors = ["L. Sandrock, ", { scrambled = 12 }]
+date = "2026"
+
+[[publications]]
+title = "Type Inference for Dependent Types"
+description = "Extending Hindley-Milner with dependent types. Covers constraint solving and unification algorithms."
+url = "https://arxiv.org"
+authors = "L. Sandrock"
+date = "2024"
+
+[[publications]]
+title = "A Category-Theoretic View of Neural Networks"
+description = "Formalizing neural network architectures as functors between categories of vector spaces."
+url = "https://arxiv.org"
+authors = "L. Sandrock, S. Category"
+date = "2024"
+
+[[publications]]
+title = "Constructive Set Theory in Lean"
+description = "FormalizingZF set theory in Lean's dependent type theory. Exploring the ordinal hierarchy."
+url = "https://github.com/lsck0/lean-set-theory"
+authors = "L. Sandrock"
+date = "2023"

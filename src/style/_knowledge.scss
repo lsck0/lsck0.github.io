@@ -1,0 +1,181 @@
+// ---- Labeled blocks (definition, theorem, lemma, etc.) ----
+
+.labeled-block {
+  margin: 1.5rem 0;
+  padding: 0;
+
+  .labeled-block-header {
+    margin-bottom: 0.5rem;
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--text);
+
+    strong { font-weight: 700; }
+    em { font-style: italic; }
+  }
+
+  .labeled-block-content {
+    p:first-child { margin-top: 0; }
+    p:last-child { margin-bottom: 0; }
+
+    ul, ol {
+      margin: 0.5rem 0;
+      padding-left: 1.5rem;
+    }
+  }
+}
+
+// ---- All non-proof kinds ----
+
+.labeled-block.definition,
+.labeled-block.theorem,
+.labeled-block.lemma,
+.labeled-block.corollary,
+.labeled-block.proposition,
+.labeled-block.example,
+.labeled-block.axiom,
+.labeled-block.remark,
+.labeled-block.conjecture,
+.labeled-block.exercise,
+.labeled-block.problem {
+  // No border - header is dominant
+}
+
+// ---- Proof blocks ----
+
+.labeled-block.proof {
+  border-left: none;
+  padding-left: 0;
+}
+
+.qed {
+  float: right;
+  font-size: 1.1em;
+  line-height: 1;
+  margin-top: -1.5em;
+}
+
+// ---- Statement → Proof association ----
+// When a proof immediately follows a theorem/lemma/corollary/proposition,
+// collapse the gap and add a connecting left border to show they belong together.
+
+.labeled-block.theorem,
+.labeled-block.lemma,
+.labeled-block.corollary,
+.labeled-block.proposition,
+.labeled-block.conjecture {
+  + .labeled-block.proof {
+    margin-top: -0.75rem;
+    padding-left: 1rem;
+    border-left: 2px solid var(--border);
+  }
+}
+
+// ---- Cross-references (explicit [[label]] links) ----
+
+.xref {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-muted);
+  cursor: help;
+
+  &:hover {
+    border-bottom-color: var(--accent);
+    color: var(--accent);
+  }
+}
+
+.xref-broken {
+  color: var(--tag-exclude-text);
+  text-decoration: line-through;
+  font-size: 0.9em;
+}
+
+// ---- Auto-linked definitions (seamless hover terms) ----
+
+.auto-def {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  cursor: help;
+  transition: border-color 0.1s ease;
+
+  &:hover {
+    border-bottom-color: var(--accent);
+    color: var(--accent);
+  }
+}
+
+// ---- Hover preview tooltip (shared by xref, auto-def, links) ----
+
+.xref-tooltip {
+  position: fixed;
+  z-index: 1001;
+  max-width: 420px;
+  min-width: 200px;
+  padding: 0.75rem 1rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+
+  &.visible { opacity: 1; }
+
+  p { margin: 0.25rem 0; }
+  p:first-child { margin-top: 0; }
+  p:last-child { margin-bottom: 0; }
+
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.2rem;
+    font-size: 0.85em;
+  }
+
+  pre {
+    background: var(--code-bg);
+    padding: 0.5rem;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    margin: 0.25rem 0;
+  }
+}
+
+[data-theme="dark"] .xref-tooltip {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+// ---- External link preview ----
+
+.ext-preview {
+  .ext-preview-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .ext-favicon {
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .ext-domain {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .ext-title {
+    font-size: 0.85rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .ext-path {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    word-break: break-all;
+  }
+}

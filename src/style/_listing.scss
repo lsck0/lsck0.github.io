@@ -1,0 +1,84 @@
+// ---- Listing pages (projects, publications) ----
+
+.listing-page {
+  max-width: 720px;
+
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .listing {
+    list-style: none;
+
+    ul {
+      list-style: none;
+    }
+
+    li {
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .listing-category {
+      margin-bottom: 2rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    .listing-category-title {
+      font-size: 1.1rem;
+      text-transform: lowercase;
+      color: var(--text);
+      font-weight: bold;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 2px solid var(--accent);
+      border-image: linear-gradient(to right, var(--accent), transparent) 1;
+    }
+
+    .listing-title {
+      font-weight: bold;
+      font-size: 1rem;
+    }
+
+    .listing-meta {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-top: 0.2rem;
+    }
+
+    .listing-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    .scramble-text {
+      display: inline;
+      font-family: inherit;
+    }
+
+    .teaser .scramble-text {
+      opacity: 0.5;
+    }
+
+    .related-posts {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+
+      .related-sep {
+        margin: 0 0.3rem;
+      }
+    }
+  }
+}
