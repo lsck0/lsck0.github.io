@@ -2,6 +2,7 @@
 
 mod feeds;
 mod index;
+mod og;
 mod parse;
 
 use std::{
@@ -9,54 +10,66 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::{Context, Result};
 use feeds::{
     build_atom_feed, build_jsonld, build_opengraph_metadata, build_rss_feed, build_sitemap, inject_opengraph_tags,
 };
 use index::{build_graph_data, build_search_index};
+use og::build_og_metadata;
 use parse::{parse_posts_directory, resolve_transclusions};
 
 // ============================================================
 // Configuration (loaded from content/meta.toml)
 // ============================================================
 
+#[allow(dead_code)]
 struct SiteConfig {
     url: String,
     title: String,
     description: String,
     author: String,
+    image: String,
 }
 
-fn load_site_config(project_root: &Path) -> SiteConfig {
+fn load_site_config(project_root: &Path) -> Result<SiteConfig> {
     let meta_path = project_root.join("content/meta.toml");
-    let meta_str = fs::read_to_string(&meta_path).unwrap_or_else(|_| panic!("failed to read: {}", meta_path.display()));
-    let meta: toml::Value = meta_str.parse().expect("failed to parse meta.toml");
+    let meta_str =
+        fs::read_to_string(&meta_path).with_context(|| format!("failed to read: {}", meta_path.display()))?;
+    let meta: toml::Value = meta_str.parse().context("failed to parse meta.toml")?;
 
-    let site = meta.get("site").expect("meta.toml missing [site] section");
-    let get = |key| {
-        site.get(key)
+    let site = meta.get("site").context("meta.toml missing [site] section")?;
+    let get = |key: &str| -> Result<String> {
+        Ok(site
+            .get(key)
             .and_then(|v| v.as_str())
-            .unwrap_or_else(|| panic!("meta.toml missing site.{key}"))
-            .to_string()
+            .with_context(|| format!("meta.toml missing site.{key}"))?
+            .to_string())
     };
 
-    return SiteConfig {
-        url: get("url"),
-        title: get("title"),
-        description: get("description"),
-        author: get("author"),
-    };
+    let url = get("url")?;
+    return Ok(SiteConfig {
+        image: site
+            .get("image")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("{}/og-image.png", url)),
+        url,
+        title: get("title")?,
+        description: get("description")?,
+        author: get("author")?,
+    });
 }
 
 // ============================================================
 // Main
 // ============================================================
 
-fn main() {
+fn main() -> Result<()> {
     let project_root = env::var("CARGO_MANIFEST_DIR")
         .map(|dir| PathBuf::from(dir).join("../.."))
         .unwrap_or_else(|_| PathBuf::from("."));
 
-    let config = load_site_config(&project_root);
+    let config = load_site_config(&project_root)?;
 
     let content_dir = project_root.join("content/posts");
     let output_dir = project_root.join("dist");
@@ -70,12 +83,6 @@ fn main() {
 
     // ---- Inject site metadata into index.html ----
     let index_html_path = output_dir.join("index.html");
-    if index_html_path.exists() {
-        let html = fs::read_to_string(&index_html_path).expect("failed to read index.html");
-        let patched = inject_site_meta(&html, &config);
-        fs::write(&index_html_path, &patched).expect("failed to write index.html");
-        println!("  patched: index.html with meta.toml values");
-    }
 
     // ---- JSON indexes ----
     let graph_data = build_graph_data(&published);
@@ -83,31 +90,40 @@ fn main() {
 
     write_file(
         &output_dir.join("graph.json"),
-        &serde_json::to_string_pretty(&graph_data).expect("failed to serialize graph"),
-    );
+        &serde_json::to_string_pretty(&graph_data).context("failed to serialize graph")?,
+    )?;
     write_file(
         &output_dir.join("search_index.json"),
-        &serde_json::to_string_pretty(&search_index).expect("failed to serialize search index"),
-    );
+        &serde_json::to_string_pretty(&search_index).context("failed to serialize search index")?,
+    )?;
 
     // ---- Feeds ----
     write_file(
         &output_dir.join("rss.xml"),
         &build_rss_feed(&published, &config.url, &config.title),
-    );
+    )?;
     write_file(
         &output_dir.join("atom.xml"),
         &build_atom_feed(&published, &config.url, &config.title),
-    );
-    write_file(&output_dir.join("sitemap.xml"), &build_sitemap(&published, &config.url));
+    )?;
+    write_file(&output_dir.join("sitemap.xml"), &build_sitemap(&published, &config.url))?;
+
+    // ---- External link OG metadata ----
+    let og_cache_path = output_dir.join("og_external.json");
+    let og_metadata = build_og_metadata(&published, &og_cache_path)?;
+    write_file(
+        &og_cache_path,
+        &serde_json::to_string_pretty(&og_metadata).context("failed to serialize OG metadata")?,
+    )?;
+    println!("Cached OG metadata for {} external links.", og_metadata.len());
 
     // ---- llms.txt ----
-    write_file(&output_dir.join("llms.txt"), &build_llms_txt());
+    write_file(&output_dir.join("llms.txt"), &build_llms_txt())?;
 
     // ---- OG meta tag pages + JSON-LD ----
     if index_html_path.exists() {
-        let base_html = fs::read_to_string(&index_html_path).expect("failed to read index.html");
-        let og_entries = build_opengraph_metadata(&published, &config.url);
+        let base_html = fs::read_to_string(&index_html_path).context("failed to read index.html")?;
+        let og_entries = build_opengraph_metadata(&published, &config.url, &config.image);
 
         for entry in &og_entries {
             let mut post_html = inject_opengraph_tags(&base_html, entry, &config.title);
@@ -115,41 +131,29 @@ fn main() {
             post_html = post_html.replace("</head>", &format!("{jsonld}\n  </head>"));
 
             let post_dir = output_dir.join("blog").join(&entry.slug);
-            write_file(&post_dir.join("index.html"), &post_html);
+            write_file(&post_dir.join("index.html"), &post_html)?;
         }
         println!("Generated OG pages for {} posts.", og_entries.len());
     } else {
         println!("Warning: index.html not found, skipping OG page generation.");
     }
 
+    // ---- Static route fallbacks (SPA routing for direct navigation) ----
+    if index_html_path.exists() {
+        let base_html = fs::read_to_string(&index_html_path).context("failed to read index.html")?;
+        let static_routes = ["projects", "publications", "about", "blog", "imprint", "privacy", "tos"];
+        for route in &static_routes {
+            let route_dir = output_dir.join(route);
+            let route_index = route_dir.join("index.html");
+            if !route_index.exists() {
+                write_file(&route_index, &base_html)?;
+            }
+        }
+        println!("Generated static route fallbacks.");
+    }
+
     println!("Indexer complete. Output: {}", output_dir.display());
-}
-
-// ============================================================
-// Inject site metadata into index.html (single source of truth: meta.toml)
-// ============================================================
-
-fn inject_site_meta(html: &str, config: &SiteConfig) -> String {
-    let mut result = html.to_string();
-
-    // Replace placeholder meta tags with values from meta.toml
-    // These use data-meta="..." attributes as stable anchors for replacement.
-    result = result.replace(
-        "content=\"__META_DESCRIPTION__\"",
-        &format!("content=\"{}\"", config.description),
-    );
-    result = result.replace("content=\"__META_AUTHOR__\"", &format!("content=\"{}\"", config.author));
-    result = result.replace(
-        "content=\"__META_OG_TITLE__\"",
-        &format!("content=\"{}\"", config.title),
-    );
-    result = result.replace(
-        "content=\"__META_OG_DESCRIPTION__\"",
-        &format!("content=\"{}\"", config.description),
-    );
-    result = result.replace("content=\"__META_OG_URL__\"", &format!("content=\"{}/\"", config.url));
-
-    return result;
+    return Ok(());
 }
 
 // ============================================================
@@ -194,10 +198,11 @@ copyright and intellectual property laws.
 // File writing helper
 // ============================================================
 
-fn write_file(path: &Path, content: &str) {
+fn write_file(path: &Path, content: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).unwrap_or_else(|_| panic!("failed to create dir: {}", parent.display()));
+        fs::create_dir_all(parent).with_context(|| format!("failed to create dir: {}", parent.display()))?;
     }
-    fs::write(path, content).unwrap_or_else(|_| panic!("failed to write: {}", path.display()));
+    fs::write(path, content).with_context(|| format!("failed to write: {}", path.display()))?;
     println!("  wrote: {}", path.display());
+    return Ok(());
 }

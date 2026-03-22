@@ -28,6 +28,9 @@ pub fn Footer() -> impl IntoView {
                 <a href="https://github.com/lsck0/lsck0.github.io" target="_blank">
                     "source"
                 </a> <span class="footer-sep">{"\u{00b7}"}</span>
+                <A href="/rss.xml" attr:title="RSS Feed">
+                    "rss"
+                </A> <span class="footer-sep">{"\u{00b7}"}</span>
                 <button class="theme-toggle-footer" on:click=on_toggle_theme title="Toggle theme">
                     "toggle theme"
                 </button>

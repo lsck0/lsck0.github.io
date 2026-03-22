@@ -7,7 +7,6 @@ tags: math, algebra, linear-algebra
 publication: math
 toc: true
 sources: https://en.wikipedia.org/wiki/Vector_space
-date: 2026-01-20
 ---
 
 Linear algebra is the study of vector spaces and linear maps. This presentation follows Roman[^roman] and Axler[^axler], with the algebraic perspective from Lang[^lang].
@@ -32,7 +31,7 @@ A vector space is a *module* over a field. Modules over general [[def:ring|rings
 ```
 
 ```axiom Vector Space Axioms {#ax:vector-space}
-\begin{aligned}
+$$\begin{aligned}
 u + v &= v + u && \text{(commutativity)} \\
 (u + v) + w &= u + (v + w) && \text{(associativity)} \\
 0 + v &= v && \text{(zero)} \\
@@ -41,7 +40,7 @@ a(bv) &= (ab)v && \text{(scalar associativity)} \\
 1v &= v && \text{(scalar identity)} \\
 a(u + v) &= au + av && \text{(left distributivity)} \\
 (a + b)v &= av + bv && \text{(right distributivity)}
-\end{aligned}
+\end{aligned}$$
 ```
 
 ```example {#ex:vector-spaces}

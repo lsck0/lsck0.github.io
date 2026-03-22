@@ -2,9 +2,17 @@
 
 .math-display {
   position: relative;
-  overflow-x: auto;
+  overflow-x: visible;
   margin: 1rem 0;
   text-align: center;
+  
+  // Prevent scrollbars on math display while allowing overflow to be visible
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Hide scrollbar for Firefox */
+  scrollbar-width: none;
 }
 
 // ---- KaTeX dark mode ----

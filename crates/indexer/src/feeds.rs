@@ -115,9 +115,10 @@ pub struct OpenGraphEntry {
     pub description: String,
     pub url: String,
     pub date: String,
+    pub image: String,
 }
 
-pub fn build_opengraph_metadata(posts: &[&ContentPost], site_url: &str) -> Vec<OpenGraphEntry> {
+pub fn build_opengraph_metadata(posts: &[&ContentPost], site_url: &str, site_image: &str) -> Vec<OpenGraphEntry> {
     return posts
         .iter()
         .map(|post| OpenGraphEntry {
@@ -126,6 +127,7 @@ pub fn build_opengraph_metadata(posts: &[&ContentPost], site_url: &str) -> Vec<O
             description: post.description().to_string(),
             url: format!("{site_url}/blog/{}", post.slug),
             date: post.date().to_string(),
+            image: site_image.to_string(),
         })
         .collect();
 }
@@ -134,12 +136,31 @@ pub fn inject_opengraph_tags(base_html: &str, entry: &OpenGraphEntry, site_title
     let title = xml_escape(&entry.title);
     let desc = xml_escape(&entry.description);
     let url = xml_escape(&entry.url);
+    let image = xml_escape(&entry.image);
+
+    // Remove existing OG/meta tags that we'll replace
+    let mut result = base_html.to_string();
+    for pattern in ["og:title", "og:description", "og:url", "og:image", "og:type"] {
+        let search = format!("<meta property=\"{pattern}\"");
+        if let Some(start) = result.find(&search)
+            && let Some(end) = result[start..].find("/>")
+        {
+            result = format!("{}{}", &result[..start], &result[start + end + 2..]);
+        }
+    }
+    // Replace description meta
+    if let Some(start) = result.find("<meta name=\"description\"")
+        && let Some(end) = result[start..].find("/>")
+    {
+        result = format!("{}{}", &result[..start], &result[start + end + 2..]);
+    }
 
     let tags = format!(
         r#"    <meta property="og:type" content="article"/>
     <meta property="og:title" content="{title}"/>
     <meta property="og:description" content="{desc}"/>
     <meta property="og:url" content="{url}"/>
+    <meta property="og:image" content="{image}"/>
     <meta property="og:site_name" content="{site_title}"/>
     <meta name="twitter:card" content="summary"/>
     <meta name="twitter:title" content="{title}"/>
@@ -148,7 +169,7 @@ pub fn inject_opengraph_tags(base_html: &str, entry: &OpenGraphEntry, site_title
 "#
     );
 
-    return base_html.replace("</head>", &format!("{tags}  </head>"));
+    return result.replace("</head>", &format!("{tags}  </head>"));
 }
 
 // ============================================================
@@ -158,6 +179,7 @@ pub fn inject_opengraph_tags(base_html: &str, entry: &OpenGraphEntry, site_title
 pub fn build_jsonld(entry: &OpenGraphEntry, site_url: &str) -> String {
     let title = json_escape(&entry.title);
     let desc = json_escape(&entry.description);
+    let image = json_escape(&entry.image);
     return format!(
         r#"<script type="application/ld+json">
 {{
@@ -168,6 +190,7 @@ pub fn build_jsonld(entry: &OpenGraphEntry, site_url: &str) -> String {
   "datePublished": "{}",
   "description": "{desc}",
   "url": "{}",
+  "image": "{image}",
   "breadcrumb": {{
     "@type": "BreadcrumbList",
     "itemListElement": [

@@ -6,7 +6,6 @@ series_order: 2
 tags: cs, plt
 publication: cs
 project: plt
-date: 2026-02-12
 ---
 
 When a function is applied to an argument, *when* do we evaluate the argument? This choice has deep consequences.

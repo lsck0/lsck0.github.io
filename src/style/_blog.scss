@@ -21,7 +21,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  border-bottom: 1px solid var(--border);
   padding-bottom: 0.35rem;
   transition: border-color 0.2s ease;
 
@@ -42,7 +42,7 @@
 
     &::placeholder {
       color: var(--text-muted);
-      opacity: 0.4;
+      opacity: 0.6;
     }
   }
 }
@@ -69,7 +69,7 @@
   color: var(--text-muted);
   cursor: pointer;
   padding: 0.2rem 0.45rem;
-  opacity: 0.6;
+  opacity: 0.8;
   transition: opacity 0.15s ease, color 0.15s ease;
 
   &:hover { opacity: 1; color: var(--text); }
@@ -84,7 +84,7 @@
   align-items: center;
   gap: 0.3rem 1rem;
   padding: 0.4rem 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  border-bottom: 1px solid var(--border);
 }
 
 .tag {
@@ -93,13 +93,13 @@
   padding: 0.1rem 0.35rem;
   border: none;
   background: none;
-  color: var(--tag-text);
+  color: var(--text-muted);
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 0.8;
   transition: opacity 0.15s ease, color 0.15s ease;
 
-  &:hover { opacity: 1; color: var(--accent-hover); }
-  &.include { opacity: 1; color: var(--accent); text-decoration: underline; }
+  &:hover { opacity: 1; color: var(--text); }
+  &.include { opacity: 1; color: var(--accent); }
   &.exclude { opacity: 1; color: var(--tag-exclude-text); text-decoration: line-through; }
 
   &.reset {
@@ -198,7 +198,7 @@
 }
 
 .post-tags {
-  color: var(--tag-text);
+  color: var(--text-muted);
   font-size: 0.7rem;
 }
 

@@ -22,7 +22,6 @@ pub fn ProjectsPage() -> impl IntoView {
         />
         <Layout>
             <div class="listing-page">
-                <h1>"Projects"</h1>
                 <ProjectListing entries=PROJECTS />
             </div>
         </Layout>

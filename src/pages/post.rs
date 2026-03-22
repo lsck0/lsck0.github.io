@@ -19,6 +19,37 @@ use crate::{
 };
 
 // ============================================================
+// Reference link data
+// ============================================================
+
+struct PostLink {
+    url: String,
+    title: String,
+    description: String,
+    tags: String,
+    series: String,
+    anchors: Vec<String>,
+}
+
+impl PostLink {
+    fn from_post(post: &Post, url: &str, anchors: Vec<String>) -> Self {
+        return Self {
+            url: url.to_string(),
+            title: post.title().to_string(),
+            description: post.description().to_string(),
+            tags: post.tags().join(", "),
+            series: post.series().unwrap_or("").to_string(),
+            anchors,
+        };
+    }
+}
+
+struct ExternalLink {
+    url: String,
+    anchors: Vec<String>,
+}
+
+// ============================================================
 // Component
 // ============================================================
 
@@ -31,6 +62,7 @@ pub fn PostPage() -> impl IntoView {
     let current_post = move || {
         params.with(|map| {
             let slug = map.get("slug")?;
+            let slug = slug.trim_end_matches('/');
             POSTS.iter().find(|post| post.slug == slug)
         })
     };
@@ -126,28 +158,35 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
     let content_html = rendered.html;
     let link_occurrences = rendered.link_occurrences;
 
-    let outgoing_links: Vec<(String, String, Vec<String>)> = post
+    let outgoing_links: Vec<PostLink> = post
         .outgoing_links()
         .iter()
         .map(|linked_post| {
             let url = format!("/blog/{}", linked_post.slug);
             let anchors = link_occurrences.get(&url).cloned().unwrap_or_default();
-            (url, linked_post.title().to_string(), anchors)
+            PostLink::from_post(linked_post, &url, anchors)
         })
         .collect();
 
-    let incoming_links: Vec<(String, String)> = post
+    let incoming_links: Vec<PostLink> = post
         .incoming_links()
         .iter()
-        .map(|linked_post| (format!("/blog/{}", linked_post.slug), linked_post.title().to_string()))
+        .map(|linked_post| {
+            let url = format!("/blog/{}", linked_post.slug);
+            PostLink::from_post(linked_post, &url, vec![])
+        })
         .collect();
 
-    let external_links: Vec<(String, Vec<String>)> = post
+    let external_links: Vec<ExternalLink> = post
         .external_links
         .iter()
         .map(|url| {
-            let anchors = link_occurrences.get(*url).cloned().unwrap_or_default();
-            (url.to_string(), anchors)
+            let url_without_fragment = url.split('#').next().unwrap_or(url);
+            let anchors = link_occurrences.get(url_without_fragment).cloned().unwrap_or_default();
+            ExternalLink {
+                url: url.to_string(),
+                anchors,
+            }
         })
         .collect();
 
@@ -166,10 +205,11 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
         let _ = js_sys::eval("window.scrollTo({top: 0, behavior: 'smooth'})");
     };
 
-    let toc_html = if post.toc() {
-        Some(generate_toc(&content_html))
+    let (toc_html, content_html) = if post.toc() {
+        let (toc, numbered) = generate_toc(&content_html);
+        (Some(toc), numbered)
     } else {
-        None
+        (None, content_html)
     };
 
     view! {
@@ -202,9 +242,29 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
                             }
                         }
                     />
-                    {post.title()}
-                </h1> <div class="post-meta">
-                    <span class="date">{post.date_formatted()}</span>
+                    <span class="post-title-text" inner_html=post.title() />
+                    <button
+                        class="print-btn"
+                        on:click=|_| {
+                            let _ = js_sys::eval("printPost()");
+                        }
+                        title="Print / Save as PDF"
+                    >
+                        "pdf"
+                    </button>
+                </h1>
+                {(!post.description().is_empty())
+                    .then(|| view! { <p class="post-subtitle" inner_html=post.description() /> })}
+                <div class="post-meta">
+                    {(post.last_edited() != post.date() && !post.last_edited().is_empty())
+                        .then(|| {
+                            view! {
+                                <span class="date">
+                                    {post.date_formatted()}{", last edited "}
+                                    {post.last_edited_formatted()}
+                                </span>
+                            }
+                        })}
                     <span class="post-tags">
                         {post
                             .tags()
@@ -248,8 +308,9 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
 // Table of Contents
 // ============================================================
 
-fn generate_toc(content_html: &str) -> String {
-    let mut toc = String::from("<ul>");
+/// Extract headings from rendered HTML, returning (level, id, text) tuples.
+fn extract_headings(content_html: &str) -> Vec<(u8, String, String)> {
+    let mut headings = Vec::new();
     let mut remaining = content_html;
 
     while let Some(pos) = remaining.find("<h") {
@@ -268,42 +329,96 @@ fn generate_toc(content_html: &str) -> String {
             }
         };
 
-        // Extract ID if present: <h2 id="...">
         let header_tag_end = after.find('>').unwrap_or(0);
         let header_tag = &after[..header_tag_end];
         let id = if let Some(id_start) = header_tag.find("id=\"") {
             let id_content = &header_tag[id_start + 4..];
-            id_content.split('"').next().unwrap_or("")
+            id_content.split('"').next().unwrap_or("").to_string()
         } else {
-            ""
+            String::new()
         };
 
-        // Extract text content (strip HTML tags)
         let content_start = header_tag_end + 1;
         let close_tag = format!("</h{level_char}>");
         if let Some(close_pos) = after[content_start..].find(&close_tag) {
             let raw_text = &after[content_start..content_start + close_pos];
             let text = strip_html_tags(raw_text);
-
-            let indent = match level {
-                3 => "    ",
-                2 => "  ",
-                _ => "",
-            };
-            if !id.is_empty() {
-                toc.push_str(&format!("{indent}<li><a href=\"#{id}\">{text}</a></li>"));
-            } else {
-                toc.push_str(&format!("{indent}<li>{text}</li>"));
-            }
-
+            headings.push((level, id, text));
             remaining = &after[content_start + close_pos + close_tag.len()..];
         } else {
             remaining = after;
         }
     }
+    return headings;
+}
 
+/// Build a section number string for the given counters and depth.
+/// Uses relative indexing from the minimum heading level so numbering always starts at 1.
+fn section_number(counters: &[u32], depth: usize) -> String {
+    counters[..=depth]
+        .iter()
+        .map(|c| c.to_string())
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+/// Generate the TOC HTML and inject section numbers into content headings.
+fn generate_toc(content_html: &str) -> (String, String) {
+    let headings = extract_headings(content_html);
+    if headings.is_empty() {
+        return (String::from("<ul></ul>"), content_html.to_string());
+    }
+
+    // Determine the minimum heading level to use as the "major" level
+    let min_level = headings.iter().map(|(l, _, _)| *l).min().unwrap_or(1);
+
+    let mut toc = String::from("<ul>");
+    let mut counters = [0u32; 3];
+
+    // Also build a map of id → section number to inject into content
+    let mut section_numbers: Vec<(String, String)> = Vec::new();
+
+    for (level, id, text) in &headings {
+        let relative_depth = (*level - min_level) as usize;
+        let depth = relative_depth.min(2);
+
+        counters[depth] += 1;
+        for counter in &mut counters[depth + 1..] {
+            *counter = 0;
+        }
+
+        let sec_num = section_number(&counters, depth);
+
+        let class = match relative_depth {
+            1 => " class=\"toc-h2\"",
+            2.. => " class=\"toc-h3\"",
+            _ => "",
+        };
+
+        if !id.is_empty() {
+            toc.push_str(&format!(
+                "<li{class}><a href=\"#{id}\"><span class=\"toc-num\">{sec_num}</span> {text}</a></li>"
+            ));
+            section_numbers.push((id.clone(), sec_num));
+        } else {
+            toc.push_str(&format!(
+                "<li{class}><span class=\"toc-num\">{sec_num}</span> {text}</li>"
+            ));
+        }
+    }
     toc.push_str("</ul>");
-    return toc;
+
+    // Inject section numbers into the actual content headings
+    let mut numbered_content = content_html.to_string();
+    for (id, sec_num) in section_numbers.iter().rev() {
+        let search = format!("id=\"{id}\">");
+        if let Some(pos) = numbered_content.find(&search) {
+            let insert_pos = pos + search.len();
+            numbered_content.insert_str(insert_pos, &format!("<span class=\"heading-num\">{sec_num}</span> "));
+        }
+    }
+
+    return (toc, numbered_content);
 }
 
 fn strip_html_tags(html: &str) -> String {
@@ -438,10 +553,33 @@ fn render_backlinks(anchor_ids: Vec<String>) -> impl IntoView {
     .into_any()
 }
 
+fn render_post_link_list(links: Vec<PostLink>) -> impl IntoView {
+    links
+        .into_iter()
+        .map(|link| {
+            let title_display = link.title.clone();
+            view! {
+                <li>
+                    <a
+                        href=link.url
+                        data-post-title=link.title
+                        data-post-desc=link.description
+                        data-post-tags=link.tags
+                        data-post-series=link.series
+                    >
+                        {title_display}
+                    </a>
+                    {render_backlinks(link.anchors)}
+                </li>
+            }
+        })
+        .collect_view()
+}
+
 fn render_references(
-    outgoing: Vec<(String, String, Vec<String>)>,
-    incoming: Vec<(String, String)>,
-    external: Vec<(String, Vec<String>)>,
+    outgoing: Vec<PostLink>,
+    incoming: Vec<PostLink>,
+    external: Vec<ExternalLink>,
     sources: Vec<String>,
 ) -> impl IntoView {
     let has_any = !outgoing.is_empty() || !incoming.is_empty() || !external.is_empty() || !sources.is_empty();
@@ -456,19 +594,7 @@ fn render_references(
                     view! {
                         <div class="ref-section">
                             <h2>"Internal references"</h2>
-                            <ul>
-                                {outgoing
-                                    .into_iter()
-                                    .map(|(href, title, anchors)| {
-                                        view! {
-                                            <li>
-                                                <A href=href>{title}</A>
-                                                {render_backlinks(anchors)}
-                                            </li>
-                                        }
-                                    })
-                                    .collect_view()}
-                            </ul>
+                            <ul>{render_post_link_list(outgoing)}</ul>
                         </div>
                     }
                 })}
@@ -480,14 +606,14 @@ fn render_references(
                             <ul>
                                 {external
                                     .into_iter()
-                                    .map(|(url, anchors)| {
-                                        let display = url.clone();
+                                    .map(|link| {
+                                        let display = link.url.clone();
                                         view! {
                                             <li>
-                                                <a href=url target="_blank">
+                                                <a href=link.url target="_blank">
                                                     {display}
                                                 </a>
-                                                {render_backlinks(anchors)}
+                                                {render_backlinks(link.anchors)}
                                             </li>
                                         }
                                     })
@@ -524,18 +650,7 @@ fn render_references(
                     view! {
                         <div class="ref-section">
                             <h2>"Referenced internally by"</h2>
-                            <ul>
-                                {incoming
-                                    .into_iter()
-                                    .map(|(href, title)| {
-                                        view! {
-                                            <li>
-                                                <A href=href>{title}</A>
-                                            </li>
-                                        }
-                                    })
-                                    .collect_view()}
-                            </ul>
+                            <ul>{render_post_link_list(incoming)}</ul>
                         </div>
                     }
                 })}

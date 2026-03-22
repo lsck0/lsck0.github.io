@@ -7,7 +7,6 @@ tags: math, algebra
 publication: math
 toc: true
 sources: https://en.wikipedia.org/wiki/Group_(mathematics), https://en.wikipedia.org/wiki/Isomorphism_theorems
-date: 2026-03-06
 ---
 
 The foundational treatment follows Lang[^lang] and Dummit & Foote[^df]. We also draw on Aluffi[^aluffi] for the categorical perspective.

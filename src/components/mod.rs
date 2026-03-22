@@ -8,6 +8,7 @@ pub mod footer;
 pub mod header;
 pub mod layout;
 pub mod listing;
+pub mod pinned_panel;
 pub mod post_search;
 pub mod render;
 pub mod scramble;

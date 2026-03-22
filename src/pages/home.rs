@@ -16,7 +16,7 @@ fn messages() -> Vec<&'static str> {
 
 const TYPE_SPEED: u64 = 65;
 const DELETE_SPEED: u64 = 35;
-const PAUSE_TIME: u64 = 2400;
+const PAUSE_TIME: u64 = 5000;
 
 // ============================================================
 // Component
@@ -117,7 +117,10 @@ pub fn HomePage() -> impl IntoView {
 
     return view! {
         <Title text=META.page_title("home") />
-        <Meta name="description" content=META.page("home").map(|page| page.description).unwrap_or("") />
+        <Meta
+            name="description"
+            content=META.page("home").map(|page| page.description).unwrap_or("")
+        />
         <canvas id="simplicial-bg" class="simplicial-bg"></canvas>
         <main class="home">
             <div class="home-content">

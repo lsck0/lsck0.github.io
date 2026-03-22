@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use leptos::prelude::*;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd, html};
 
 use crate::models::post::POSTS;
@@ -7,6 +8,14 @@ use crate::models::post::POSTS;
 // ============================================================
 // Public API
 // ============================================================
+
+/// Calls the JS `renderPost()` function after the current component mounts.
+/// Used by post pages and prose pages to initialize tooltips, math, diagrams, etc.
+pub fn call_render_post() {
+    Effect::new(move |_: Option<()>| {
+        let _ = js_sys::eval("renderPost();");
+    });
+}
 
 pub struct RenderedMarkdown {
     pub html: String,
@@ -18,12 +27,15 @@ pub fn markdown_to_html(markdown: &str) -> RenderedMarkdown {
         Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_MATH | Options::ENABLE_FOOTNOTES;
 
     let parser = Parser::new_ext(markdown, options);
-    let (events, link_occurrences) = process_events(parser);
+    let (events, mut link_occurrences) = process_events(parser);
 
     let mut output = String::new();
     html::push_html(&mut output, events.into_iter());
     output = process_callouts(&output);
     output = process_labeled_blocks(&output);
+
+    // Post-process to track xref links that were rendered as HTML
+    output = extract_xref_links(&output, &mut link_occurrences);
 
     return RenderedMarkdown {
         html: output,
@@ -77,7 +89,8 @@ enum State {
     Special(SpecialBlock, String),
     Image(String, String, u32),
     MediaLink(String, String, String),
-    Heading(u8, String),
+    /// Heading(level, plain_text_for_slug, html_content)
+    Heading(u8, String, String),
 }
 
 fn detect_media_type(url: &str) -> Option<String> {
@@ -119,28 +132,33 @@ fn process_events<'a>(parser: impl Iterator<Item = Event<'a>>) -> (Vec<Event<'a>
                 _ => State::Special(block, buffer),
             },
 
-            State::Heading(level, mut buffer) => match event {
+            State::Heading(level, mut plain, mut html_buf) => match event {
                 Event::Text(text) => {
-                    buffer.push_str(&text);
-                    State::Heading(level, buffer)
+                    plain.push_str(&text);
+                    html_buf.push_str(&html_escape(&text));
+                    State::Heading(level, plain, html_buf)
                 }
                 Event::InlineMath(math) => {
-                    buffer.push_str(&math);
-                    State::Heading(level, buffer)
+                    plain.push_str(&math);
+                    let escaped = html_escape(&math);
+                    html_buf.push_str(&format!(
+                        "<span class=\"math-inline\" data-latex=\"{escaped}\">\\({escaped}\\)</span>"
+                    ));
+                    State::Heading(level, plain, html_buf)
                 }
                 Event::Code(code) => {
-                    buffer.push_str(&code);
-                    State::Heading(level, buffer)
+                    plain.push_str(&code);
+                    html_buf.push_str(&format!("<code>{}</code>", html_escape(&code)));
+                    State::Heading(level, plain, html_buf)
                 }
                 Event::End(TagEnd::Heading(_)) => {
-                    let id = slugify(&buffer);
-                    let escaped = html_escape(&buffer);
+                    let id = slugify(&plain);
                     events.push(Event::Html(
-                        format!("<h{level} id=\"{id}\">{escaped}</h{level}>").into(),
+                        format!("<h{level} id=\"{id}\">{html_buf}</h{level}>").into(),
                     ));
                     State::Normal
                 }
-                _ => State::Heading(level, buffer),
+                _ => State::Heading(level, plain, html_buf),
             },
 
             State::Image(url, mut alt_text, id) => match event {
@@ -208,7 +226,7 @@ fn process_events<'a>(parser: impl Iterator<Item = Event<'a>>) -> (Vec<Event<'a>
                         HeadingLevel::H5 => 5,
                         HeadingLevel::H6 => 6,
                     };
-                    State::Heading(numeric_level, String::new())
+                    State::Heading(numeric_level, String::new(), String::new())
                 }
                 Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language))) => {
                     let language_string = language.to_string();
@@ -269,11 +287,22 @@ fn process_events<'a>(parser: impl Iterator<Item = Event<'a>>) -> (Vec<Event<'a>
                             } else {
                                 String::new()
                             };
+                            let url_without_fragment = url.split('#').next().unwrap_or(&url);
+                            link_occurrences
+                                .entry(url_without_fragment.to_string())
+                                .or_default()
+                                .push(anchor_id.clone());
                             events.push(Event::Html(
-                                format!("<a href=\"{url}\" id=\"{anchor_id}\"{metadata_attributes}>").into(),
+                                format!(
+                                    "<a href=\"{url}\" id=\"{anchor_id}\"{metadata_attributes} target=\"_blank\" \
+                                     rel=\"noopener\">"
+                                )
+                                .into(),
                             ));
                         } else {
-                            events.push(Event::Html(format!("<a href=\"{url}\">").into()));
+                            events.push(Event::Html(
+                                format!("<a href=\"{url}\" target=\"_blank\" rel=\"noopener\">").into(),
+                            ));
                         }
                         State::Normal
                     }
@@ -331,7 +360,7 @@ fn render_diff_code(text: &str) -> String {
 
 /// Converts blockquotes starting with `[!TYPE]` into styled admonition blocks.
 fn process_callouts(html: &str) -> String {
-    let callout_types = ["tip", "warning", "danger", "note", "info"];
+    let callout_types = ["info", "warning", "tip", "danger", "note"];
     let mut result = html.to_string();
 
     for callout_type in &callout_types {
@@ -396,7 +425,7 @@ fn process_labeled_blocks(html: &str) -> String {
                 if parts.len() == 4 {
                     let kind = parts[0];
                     let id = parts[1];
-                    let number: u32 = parts[2].parse().unwrap_or(0);
+                    let number = parts[2];
                     let title = parts[3].replace("\\|", "|");
 
                     let kind_display = capitalize_first(kind);
@@ -404,11 +433,11 @@ fn process_labeled_blocks(html: &str) -> String {
 
                     let header_html = if is_proof {
                         if title.is_empty() {
-                            "<em>Proof.</em>".to_string()
+                            "<strong>Proof.</strong>".to_string()
                         } else {
-                            format!("<em>Proof ({title}).</em>")
+                            format!("<strong>Proof</strong> ({title})<strong>.</strong>")
                         }
-                    } else if number > 0 {
+                    } else if !number.is_empty() {
                         if title.is_empty() {
                             format!("<strong>{kind_display} {number}.</strong>")
                         } else {
@@ -486,4 +515,59 @@ fn html_escape(input: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;");
+}
+
+// ============================================================
+// XRef link tracking
+// ============================================================
+
+fn extract_xref_links(html: &str, link_occurrences: &mut HashMap<String, Vec<String>>) -> String {
+    let mut result = html.to_string();
+    let mut link_counter = 1000;
+
+    for class in ["xref", "auto-def"] {
+        let search_pattern = format!("class=\"{}\"", class);
+        let mut offsets_to_insert: Vec<(usize, String)> = Vec::new();
+
+        let mut search_start = 0;
+        while let Some(class_pos) = result[search_start..].find(&search_pattern) {
+            let absolute_pos = search_start + class_pos;
+            let after_class = absolute_pos + search_pattern.len();
+
+            let href_start = match result[after_class..].find("href=\"") {
+                Some(pos) => after_class + pos + 6,
+                None => {
+                    search_start = absolute_pos + 1;
+                    continue;
+                }
+            };
+            let href_end = match result[href_start..].find('"') {
+                Some(pos) => href_start + pos,
+                None => {
+                    search_start = absolute_pos + 1;
+                    continue;
+                }
+            };
+
+            let href = &result[href_start..href_end].to_string();
+            if href.starts_with("/blog/") || href.starts_with("http") {
+                link_counter += 1;
+                let anchor_id = format!("ref-{}", link_counter);
+                let url_without_fragment = href.split('#').next().unwrap_or(href);
+                link_occurrences
+                    .entry(url_without_fragment.to_string())
+                    .or_default()
+                    .push(anchor_id.clone());
+                offsets_to_insert.push((absolute_pos, format!(" id=\"{}\"", anchor_id)));
+            }
+
+            search_start = absolute_pos + 1;
+        }
+
+        for (pos, insert_text) in offsets_to_insert.into_iter().rev() {
+            result.insert_str(pos, &insert_text);
+        }
+    }
+
+    result
 }

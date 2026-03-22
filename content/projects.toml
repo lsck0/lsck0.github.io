@@ -19,13 +19,11 @@ status = "maintained"
 [[projects]]
 title = ["type-", { scrambled = 8 }]
 description = [{ scrambled = 50 }]
-url = ""
 status = "planned"
 
 [[projects]]
 title = "old-blog"
 description = "Previous iteration of this site, built with Hugo. Replaced by the current Leptos/WASM stack."
-url = ""
 status = "abandoned"
 
 [[projects]]
@@ -43,5 +41,17 @@ status = "maintained"
 [[projects]]
 title = "lean-game"
 description = "An interactive proof assistant tutorial for learning dependent type theory through puzzles."
-url = ""
 status = "planned"
+
+[[projects]]
+title = "Corporate Dashboard"
+description = "Internal analytics dashboard for a Fortune 500 company. Technologies: React, GraphQL, PostgreSQL."
+status = "maintained"
+company = "Acme Corp"
+
+[[projects]]
+title = "Client Portal"
+description = "Secure client-facing portal for a financial services firm. Built with Vue.js and .NET Core."
+status = "wip"
+company = "Confidential"
+anonymous = true

@@ -7,7 +7,6 @@ tags: math, algebra
 publication: math
 toc: true
 sources: https://en.wikipedia.org/wiki/Presentation_of_a_group, https://en.wikipedia.org/wiki/Free_group
-date: 2026-01-10
 ---
 
 How do you describe a group? If it's finite and small, you can write down its multiplication table. But this is impractical for large or infinite groups. **Presentations** give a compact description: specify generators and the relations they satisfy. This chapter follows Rotman[^rotman] and Magnus et al.[^magnus].

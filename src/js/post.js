@@ -1,7 +1,26 @@
 function renderPost() {
   requestAnimationFrame(function () {
     var el = document.getElementById("post-content");
-    if (!el) return;
+    if (!el) {
+      // Also handle listing pages (projects, publications)
+      var listingEl = document.getElementById("listing-content");
+      if (listingEl) {
+        if (window.renderMathInElement) {
+          renderMathInElement(listingEl, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false },
+              { left: "\\(", right: "\\)", display: false },
+              { left: "\\[", right: "\\]", display: true },
+            ],
+            throwOnError: false,
+          });
+        }
+        setupTooltips(listingEl);
+        setupMediaEmbeds(listingEl);
+      }
+      return;
+    }
 
     // ---- TikZ diagrams ----
     var hasTikz = false;
@@ -14,7 +33,10 @@ function renderPost() {
       var s = document.createElement("script");
       s.type = "text/tikz";
       var libs = pre.getAttribute("data-libs");
-      if (libs) s.setAttribute("data-tikz-libraries", libs);
+      if (libs) {
+        s.setAttribute("data-tikz-libraries", libs);
+        wrapper.setAttribute("data-tikz-libs", libs);
+      }
       s.textContent = pre.textContent;
 
       wrapper.appendChild(s);
@@ -172,12 +194,15 @@ function pollTikzSize(el) {
       if (isNaN(widthPt) || isNaN(heightPt)) return;
 
       var containerWidth = wrapper.parentElement ? wrapper.parentElement.offsetWidth : 600;
-      var scale = Math.min(containerWidth / widthPt, 1.5);
+      var isTikzCd = wrapper.getAttribute("data-tikz-libs") === "cd";
+      var maxScale = isTikzCd ? 1.8 : 1.5;
+      var baseScale = isTikzCd ? 1.2 : 1.0;
+      var scale = Math.min(containerWidth / widthPt * baseScale, maxScale);
 
-      page.style.setProperty("transform", "scale(" + scale + ")", "important");
-      page.style.setProperty("transform-origin", "top center", "important");
-      page.style.setProperty("width", w, "important");
-      page.style.setProperty("height", h, "important");
+      page.style.setProperty("transform", "scale(" + scale + ")");
+      page.style.setProperty("transform-origin", "top center");
+      page.style.setProperty("width", w);
+      page.style.setProperty("height", h);
 
       wrapper.style.width = "100%";
       wrapper.style.height = heightPt * scale + "pt";
@@ -192,50 +217,122 @@ function pollTikzSize(el) {
 // ============================================================
 
 function repositionFootnotes(el) {
-  if (window.innerWidth < 1200) return;
-  el.querySelectorAll("sup.footnote-reference").forEach(function (sup) {
-    var a = sup.querySelector("a");
-    if (!a) return;
-    var href = a.getAttribute("href");
-    if (!href || !href.startsWith("#")) return;
-    var id = href.slice(1);
-    var def = el.querySelector("#" + CSS.escape(id));
-    if (!def || !def.classList.contains("footnote-definition")) return;
-    var para = sup.closest("p, li, td, th, blockquote");
-    if (para && para.parentNode) {
-      para.parentNode.insertBefore(def, para.nextSibling);
+  if (window.innerWidth < 1200) {
+    // On mobile: move all footnotes to before the references section
+    var footnotes = Array.from(el.querySelectorAll(".footnote-definition"));
+    if (footnotes.length === 0) return;
+
+    var content = el;
+    var referencesSection = content.querySelector(".post-references");
+    var footnotesContainer = document.createElement("div");
+    footnotesContainer.className = "footnotes-section";
+
+    var header = document.createElement("h2");
+    header.textContent = "Footnotes";
+    footnotesContainer.appendChild(header);
+
+    footnotes.forEach(function (footnote) {
+      footnote.parentNode.removeChild(footnote);
+      footnotesContainer.appendChild(footnote);
+    });
+
+    if (referencesSection) {
+      content.insertBefore(footnotesContainer, referencesSection);
+    } else {
+      content.appendChild(footnotesContainer);
     }
-  });
+  } else {
+    // On desktop: move footnotes to sidebar as before
+    el.querySelectorAll("sup.footnote-reference").forEach(function (sup) {
+      var a = sup.querySelector("a");
+      if (!a) return;
+      var href = a.getAttribute("href");
+      if (!href || !href.startsWith("#")) return;
+      var id = href.slice(1);
+      var def = el.querySelector("#" + CSS.escape(id));
+      if (!def || !def.classList.contains("footnote-definition")) return;
+      var para = sup.closest("p, li, td, th, blockquote");
+      if (para && para.parentNode) {
+        para.parentNode.insertBefore(def, para.nextSibling);
+      }
+    });
+  }
 }
 
 // ============================================================
 // Unified tooltip system
 // ============================================================
 
-var _tooltip = null;
+// ============================================================
+// Tooltip stack (supports nested hovers)
+// ============================================================
 
-function getTooltip() {
-  if (!_tooltip) {
-    _tooltip = document.createElement("div");
-    _tooltip.className = "xref-tooltip";
-    _tooltip.addEventListener("mouseenter", function () {
-      _tooltip.classList.add("visible");
-    });
-    _tooltip.addEventListener("mouseleave", function () {
-      _tooltip.classList.remove("visible");
-    });
-    document.body.appendChild(_tooltip);
+var _tooltipStack = [];
+var _tooltipShowTimer = null;
+var _tooltipCooldown = 0;
+var _ogMetadata = null;
+
+// Load pre-fetched OG metadata for external links
+fetch("/og_external.json")
+  .then(function (r) { return r.ok ? r.json() : {}; })
+  .then(function (data) { _ogMetadata = data; })
+  .catch(function () { _ogMetadata = {}; });
+
+function escapeHtml(text) {
+  var div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function createTooltip(depth) {
+  var tooltip = document.createElement("div");
+  tooltip.className = "xref-tooltip";
+  tooltip.style.zIndex = 1001 + depth;
+  tooltip._depth = depth;
+  tooltip._hideTimer = null;
+
+  tooltip.addEventListener("mouseenter", function () {
+    clearTimeout(tooltip._hideTimer);
+    // Also cancel hide on parent tooltips
+    for (var i = 0; i < depth; i++) {
+      if (_tooltipStack[i]) clearTimeout(_tooltipStack[i]._hideTimer);
+    }
+    tooltip.classList.add("visible");
+  });
+  tooltip.addEventListener("mouseleave", function () {
+    scheduleHideTooltipAt(depth);
+    // Also schedule hide on parent tooltips (they'll check child visibility)
+    for (var i = depth - 1; i >= 0; i--) {
+      scheduleHideTooltipAt(i);
+    }
+  });
+
+  document.body.appendChild(tooltip);
+  return tooltip;
+}
+
+function getTooltipAt(depth) {
+  while (_tooltipStack.length <= depth) {
+    _tooltipStack.push(createTooltip(_tooltipStack.length));
   }
-  return _tooltip;
+  return _tooltipStack[depth];
 }
 
 function positionTooltip(tooltip, anchor) {
+  var depth = tooltip._depth || 0;
+  clearTimeout(tooltip._hideTimer);
+  // Cancel hide timers on all parent tooltips (keep them visible)
+  for (var i = 0; i < depth; i++) {
+    if (_tooltipStack[i]) clearTimeout(_tooltipStack[i]._hideTimer);
+  }
+  tooltip.style.pointerEvents = "auto";
   var rect = anchor.getBoundingClientRect();
-  var maxWidth = 420;
-  var left = Math.min(rect.left, window.innerWidth - maxWidth - 16);
-  var top = rect.bottom + 8;
-  if (top + 200 > window.innerHeight) {
-    top = rect.top - 8;
+  var maxWidth = 600;
+  var offset = depth * 12; // Stack offset for nested tooltips
+  var left = Math.min(rect.left + offset, window.innerWidth - maxWidth - 16);
+  var top = rect.bottom + 8 + offset;
+  if (top + 250 > window.innerHeight) {
+    top = rect.top - 8 - offset;
     tooltip.style.transform = "translateY(-100%)";
   } else {
     tooltip.style.transform = "";
@@ -245,19 +342,123 @@ function positionTooltip(tooltip, anchor) {
   tooltip.classList.add("visible");
 }
 
-function hideTooltip() {
-  if (_tooltip) _tooltip.classList.remove("visible");
+function isChildTooltipVisible(depth) {
+  for (var i = depth + 1; i < _tooltipStack.length; i++) {
+    if (_tooltipStack[i].classList.contains("visible")) return true;
+  }
+  return false;
 }
 
-function setupTooltips(el) {
-  // Cross-references and auto-definitions (both have data-preview)
-  el.querySelectorAll("[data-preview]").forEach(function (link) {
-    link.addEventListener("mouseenter", function () {
-      var preview = link.getAttribute("data-preview");
-      if (!preview) return;
-      var tooltip = getTooltip();
-      tooltip.innerHTML = markdownPreview(preview);
-      if (window.renderMathInElement) {
+function scheduleHideTooltipAt(depth) {
+  var tooltip = _tooltipStack[depth];
+  if (!tooltip) return;
+  clearTimeout(tooltip._hideTimer);
+  tooltip._hideTimer = setTimeout(function () {
+    // Don't hide if a deeper tooltip is still visible (user moved into it)
+    if (isChildTooltipVisible(depth)) return;
+    tooltip.classList.remove("visible");
+    tooltip.style.pointerEvents = "none";
+    // Also hide deeper tooltips
+    for (var i = depth + 1; i < _tooltipStack.length; i++) {
+      _tooltipStack[i].classList.remove("visible");
+      _tooltipStack[i].style.pointerEvents = "none";
+    }
+    if (depth === 0) {
+      _tooltipCooldown = Date.now();
+    }
+  }, 200);
+}
+
+function hideTooltip() {
+  clearTimeout(_tooltipShowTimer);
+  for (var i = 0; i < _tooltipStack.length; i++) {
+    clearTimeout(_tooltipStack[i]._hideTimer);
+    _tooltipStack[i].classList.remove("visible");
+  }
+  _tooltipCooldown = Date.now();
+}
+
+// Hide tooltip on any navigation (click or popstate)
+document.addEventListener("click", function () { hideTooltip(); });
+window.addEventListener("popstate", function () { hideTooltip(); });
+
+// Print with diagrams prepared for light/static rendering
+function printPost() {
+  var el = document.getElementById("post-content");
+  if (!el) { window.print(); return; }
+
+  // ---- Prepare TikZ diagrams: reset scaling and absolute positioning ----
+  var tikzWrappers = el.querySelectorAll(".tikz-diagram");
+  var savedTikz = [];
+  tikzWrappers.forEach(function (wrapper) {
+    var page = wrapper.querySelector(".page");
+    var svg = page ? page.querySelector("svg") : null;
+    savedTikz.push({
+      wrapperCss: wrapper.style.cssText,
+      pageCss: page ? page.style.cssText : "",
+      svgCss: svg ? svg.style.cssText : ""
+    });
+    if (page) {
+      page.style.cssText = "position: static; height: auto; width: auto;";
+    }
+    if (svg) {
+      svg.style.position = "static";
+    }
+    wrapper.style.height = "auto";
+  });
+
+  function restoreTikz() {
+    tikzWrappers.forEach(function (wrapper, i) {
+      wrapper.style.cssText = savedTikz[i].wrapperCss;
+      var page = wrapper.querySelector(".page");
+      var svg = page ? page.querySelector("svg") : null;
+      if (page) page.style.cssText = savedTikz[i].pageCss;
+      if (svg) svg.style.cssText = savedTikz[i].svgCss;
+    });
+  }
+
+  // ---- Prepare Mermaid diagrams: re-render in light theme ----
+  var mermaidNodes = window.mermaid ? el.querySelectorAll(".mermaid[data-source]") : [];
+  if (mermaidNodes.length > 0) {
+    var config = getMermaidConfig("light");
+    mermaid.initialize(config);
+    mermaidNodes.forEach(function (node) {
+      var source = node.getAttribute("data-source");
+      if (source) {
+        node.removeAttribute("data-processed");
+        node.innerHTML = source;
+      }
+    });
+    mermaid.run({ nodes: mermaidNodes }).then(function () {
+      window.print();
+      restoreTikz();
+      // Restore mermaid to current theme
+      var theme = document.documentElement.getAttribute("data-theme") || "light";
+      mermaid.initialize(getMermaidConfig(theme));
+      mermaidNodes.forEach(function (node) {
+        var source = node.getAttribute("data-source");
+        if (source) {
+          node.removeAttribute("data-processed");
+          node.innerHTML = source;
+        }
+      });
+      mermaid.run({ nodes: mermaidNodes });
+    });
+  } else {
+    window.print();
+    restoreTikz();
+  }
+}
+
+function setupTooltips(el, depth) {
+    depth = depth || 0;
+    var maxDepth = 4; // Prevent infinite nesting
+    if (depth > maxDepth) return;
+
+    function showTooltipWithContent(link, htmlContent, renderMath) {
+      var tooltip = getTooltipAt(depth);
+      tooltip.innerHTML = htmlContent;
+      if (renderMath && window.renderMathInElement) {
         renderMathInElement(tooltip, {
           delimiters: [
             { left: "\\(", right: "\\)", display: false },
@@ -266,56 +467,160 @@ function setupTooltips(el) {
           throwOnError: false,
         });
       }
+      // Add pin button for blocks that have label metadata
+      var blockLabel = link.getAttribute("data-block-label");
+      if (blockLabel) {
+        var pinBtn = document.createElement("button");
+        pinBtn.className = "tooltip-pin-btn";
+        var pinned = isBlockPinned(blockLabel);
+        pinBtn.textContent = pinned ? "unpin" : "pin";
+        pinBtn.title = pinned ? "Unpin from sidebar" : "Pin to sidebar";
+        pinBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (isBlockPinned(blockLabel)) {
+            removePinnedBlock(blockLabel);
+            pinBtn.textContent = "pin";
+            pinBtn.title = "Pin to sidebar";
+          } else {
+            addPinnedBlock({
+              label: blockLabel,
+              kind: link.getAttribute("data-block-kind") || "",
+              title: link.getAttribute("data-block-title") || "",
+              number: link.getAttribute("data-block-number") || "",
+              preview: link.getAttribute("data-preview") || "",
+              href: link.getAttribute("href") || ""
+            });
+            pinBtn.textContent = "unpin";
+            pinBtn.title = "Unpin from sidebar";
+          }
+        });
+        tooltip.appendChild(pinBtn);
+      }
       positionTooltip(tooltip, link);
-    });
-    link.addEventListener("mouseleave", hideTooltip);
-  });
+      // Enable nested hovers within this tooltip
+      if (depth < maxDepth) {
+        setupTooltips(tooltip, depth + 1);
+      }
+    }
 
-  // Internal link previews (posts with data-post-title)
-  el.querySelectorAll("a[data-post-title]").forEach(function (link) {
-    if (link.hasAttribute("data-preview")) return; // already handled above
-    link.addEventListener("mouseenter", function () {
-      var title = link.getAttribute("data-post-title");
-      if (!title) return;
-      var desc = link.getAttribute("data-post-desc");
-      var tags = link.getAttribute("data-post-tags");
-      var series = link.getAttribute("data-post-series");
-      var tooltip = getTooltip();
-      var html = "<strong>" + title + "</strong>";
-      if (desc) html += "<p>" + desc + "</p>";
-      if (series) html += '<p style="color:var(--accent);font-size:0.8rem">' + series + "</p>";
-      if (tags) html += '<p style="font-size:0.75rem;color:var(--text-muted)">' + tags.split(", ").map(function(t) { return "#" + t; }).join(" ") + "</p>";
-      tooltip.innerHTML = html;
-      positionTooltip(tooltip, link);
+    // Cross-references and auto-definitions (both have data-preview)
+    el.querySelectorAll("[data-preview]").forEach(function (link) {
+      if (link._tooltipBound) return;
+      link._tooltipBound = true;
+      link.addEventListener("mouseenter", function () {
+        if (depth === 0 && Date.now() - _tooltipCooldown < 500) return;
+        clearTimeout(_tooltipShowTimer);
+        _tooltipShowTimer = setTimeout(function () {
+          // Try to find the rendered block on the current page for exact formatting
+          var href = link.getAttribute("href");
+          var blockId = href && href.startsWith("#") ? href.slice(1) : null;
+          var blockEl = blockId ? document.getElementById(blockId) : null;
+          if (blockEl && blockEl.classList.contains("labeled-block")) {
+            var clone = blockEl.cloneNode(true);
+            // Remove copy buttons from clone
+            clone.querySelectorAll(".math-copy-btn, .copy-btn").forEach(function(b) { b.remove(); });
+            showTooltipWithContent(link, clone.innerHTML, false);
+          } else {
+            var preview = link.getAttribute("data-preview");
+            if (!preview) return;
+            showTooltipWithContent(link, markdownPreview(preview), true);
+          }
+        }, 150);
+      });
+      link.addEventListener("mouseleave", function () {
+        clearTimeout(_tooltipShowTimer);
+        scheduleHideTooltipAt(depth);
+      });
     });
-    link.addEventListener("mouseleave", hideTooltip);
-  });
 
-  // External link previews
-  el.querySelectorAll("a[href^='http']").forEach(function (link) {
-    if (link.hasAttribute("data-post-title") || link.hasAttribute("data-preview")) return;
-    link.addEventListener("mouseenter", function () {
-      var href = link.getAttribute("href");
-      if (!href) return;
-      try { var url = new URL(href); } catch (e) { return; }
-      var tooltip = getTooltip();
-      var favicon = "https://www.google.com/s2/favicons?domain=" + url.hostname + "&sz=32";
-      var linkText = link.textContent.trim();
-      var displayText = linkText !== href ? linkText : "";
-      var path = url.pathname + url.search + url.hash;
-      if (path.length > 60) path = path.slice(0, 57) + "...";
-      var html = '<div class="ext-preview">';
-      html += '<div class="ext-preview-header">';
-      html += '<img class="ext-favicon" src="' + favicon + '" width="16" height="16" alt="" />';
-      html += '<span class="ext-domain">' + url.hostname + '</span></div>';
-      if (displayText && displayText !== url.hostname) html += '<div class="ext-title">' + displayText + '</div>';
-      if (path !== "/") html += '<div class="ext-path">' + path + '</div>';
-      html += '</div>';
-      tooltip.innerHTML = html;
-      positionTooltip(tooltip, link);
+    // Internal link previews (posts with data-post-title)
+    el.querySelectorAll("a[data-post-title]").forEach(function (link) {
+      if (link.hasAttribute("data-preview") || link._tooltipBound) return;
+      link._tooltipBound = true;
+      link.addEventListener("mouseenter", function () {
+        clearTimeout(_tooltipShowTimer);
+        _tooltipShowTimer = setTimeout(function () {
+          var title = link.getAttribute("data-post-title");
+          if (!title) return;
+          var desc = link.getAttribute("data-post-desc");
+          var tags = link.getAttribute("data-post-tags");
+          var series = link.getAttribute("data-post-series");
+          var html = "<strong>" + title + "</strong>";
+          if (desc) html += "<p>" + desc + "</p>";
+          if (series) html += '<p style="color:var(--accent);font-size:0.8rem">' + series + "</p>";
+          if (tags) html += '<p style="font-size:0.75rem;color:var(--text-muted)">' + tags.split(", ").map(function(t) { return "#" + t; }).join(" ") + "</p>";
+          showTooltipWithContent(link, html, false);
+        }, 150);
+      });
+      link.addEventListener("mouseleave", function () {
+        clearTimeout(_tooltipShowTimer);
+        scheduleHideTooltipAt(depth);
+      });
     });
-    link.addEventListener("mouseleave", hideTooltip);
-  });
+
+    // Internal non-post links (e.g. /about, /projects)
+    el.querySelectorAll("a[href^='/']").forEach(function (link) {
+      if (link.hasAttribute("data-post-title") || link.hasAttribute("data-preview") || link._tooltipBound) return;
+      if (link.getAttribute("href").startsWith("/blog/")) return;
+      link._tooltipBound = true;
+      link.addEventListener("mouseenter", function () {
+        clearTimeout(_tooltipShowTimer);
+        _tooltipShowTimer = setTimeout(function () {
+          var href = link.getAttribute("href");
+          if (!href) return;
+          var linkText = link.textContent.trim();
+          showTooltipWithContent(link, '<div class="ext-preview"><div class="ext-title">' + linkText + '</div><div class="ext-path">' + href + '</div></div>', false);
+        }, 150);
+      });
+      link.addEventListener("mouseleave", function () {
+        clearTimeout(_tooltipShowTimer);
+        scheduleHideTooltipAt(depth);
+      });
+    });
+
+    // External link previews
+    el.querySelectorAll("a[href^='http']").forEach(function (link) {
+      if (link.hasAttribute("data-post-title") || link.hasAttribute("data-preview") || link._tooltipBound) return;
+      link._tooltipBound = true;
+      link.addEventListener("mouseenter", function () {
+        clearTimeout(_tooltipShowTimer);
+        _tooltipShowTimer = setTimeout(function () {
+          var href = link.getAttribute("href");
+          if (!href) return;
+          try { var url = new URL(href); } catch (e) { return; }
+          var favicon = "https://www.google.com/s2/favicons?domain=" + url.hostname + "&sz=32";
+          var linkText = link.textContent.trim();
+          var displayText = linkText !== href ? linkText : "";
+          var path = url.pathname + url.search + url.hash;
+          if (path.length > 60) path = path.slice(0, 57) + "...";
+
+          // Check for pre-fetched OG metadata
+          var og = _ogMetadata && _ogMetadata[href];
+          var html = '<div class="ext-preview">';
+          html += '<div class="ext-preview-header">';
+          html += '<img class="ext-favicon" src="' + favicon + '" width="16" height="16" alt="" />';
+          html += '<span class="ext-domain">' + url.hostname + '</span></div>';
+          if (og && og.title) {
+            html += '<div class="ext-title">' + escapeHtml(og.title) + '</div>';
+          } else if (displayText && displayText !== url.hostname) {
+            html += '<div class="ext-title">' + displayText + '</div>';
+          }
+          if (og && og.description) {
+            html += '<div class="ext-desc">' + escapeHtml(og.description) + '</div>';
+          }
+          if (og && og.image) {
+            html += '<img class="ext-image" src="' + escapeHtml(og.image) + '" alt="" />';
+          }
+          if (path !== "/") html += '<div class="ext-path">' + path + '</div>';
+          html += '</div>';
+          showTooltipWithContent(link, html, false);
+        }, 150);
+      });
+      link.addEventListener("mouseleave", function () {
+        clearTimeout(_tooltipShowTimer);
+        scheduleHideTooltipAt(depth);
+      });
+    });
 }
 
 function markdownPreview(md) {
@@ -326,10 +631,23 @@ function markdownPreview(md) {
     .replace(/`(.+?)`/g, "<code>$1</code>")
     .replace(/\$\$(.+?)\$\$/gs, "\\[$1\\]")
     .replace(/\$(.+?)\$/g, "\\($1\\)")
+    .replace(/\\begin\{(align|align\*|multline|split)\}([\s\S]*?)\\end\{\1\}/g, "<div class=\"math-display\" data-latex=\"$2\">\\begin{$1}$2\\end{$1}</div>")
+    .replace(/\\begin\{(equation|equation\*)\}([\s\S]*?)\\end\{\1\}/g, "<div class=\"math-display\" data-latex=\"$2\">\\[$2\\]</div>")
+    .replace(/\\begin\{(gather|gather\*)\}([\s\S]*?)\\end\{\1\}/g, "<div class=\"math-display\" data-latex=\"$2\">\\begin{$1}$2\\end{$1}</div>")
+    // Lists: convert markdown list items to HTML
+    .replace(/^(\d+)\.\s+(.+)$/gm, "<li>$2</li>")
+    .replace(/^[-*]\s+(.+)$/gm, "<li>$1</li>")
+    .replace(/(<li>.*<\/li>\n?)+/g, function(match) {
+      return "<ul>" + match + "</ul>";
+    })
     .replace(/\n\n/g, "</p><p>")
     .replace(/\n/g, " ")
     .replace(/^/, "<p>")
-    .replace(/$/, "</p>");
+    .replace(/$/, "</p>")
+    // Clean up empty paragraphs
+    .replace(/<p>\s*<\/p>/g, "")
+    .replace(/<p>\s*(<ul>)/g, "$1")
+    .replace(/(<\/ul>)\s*<\/p>/g, "$1");
 }
 
 // ============================================================
@@ -439,4 +757,36 @@ function setupMediaEmbeds(el) {
     dl.textContent = "download " + (title || type);
     div.appendChild(dl);
   });
+}
+
+// ============================================================
+// Pinned blocks (localStorage persistence)
+// ============================================================
+
+var _PINNED_KEY = "pinned-blocks";
+
+function getPinnedBlocks() {
+  try {
+    return JSON.parse(localStorage.getItem(_PINNED_KEY)) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function isBlockPinned(label) {
+  return getPinnedBlocks().some(function (b) { return b.label === label; });
+}
+
+function addPinnedBlock(block) {
+  var blocks = getPinnedBlocks();
+  if (blocks.some(function (b) { return b.label === block.label; })) return;
+  blocks.push(block);
+  localStorage.setItem(_PINNED_KEY, JSON.stringify(blocks));
+  window.dispatchEvent(new CustomEvent("pinned-blocks-changed"));
+}
+
+function removePinnedBlock(label) {
+  var blocks = getPinnedBlocks().filter(function (b) { return b.label !== label; });
+  localStorage.setItem(_PINNED_KEY, JSON.stringify(blocks));
+  window.dispatchEvent(new CustomEvent("pinned-blocks-changed"));
 }

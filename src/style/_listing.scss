@@ -33,17 +33,15 @@
       }
     }
 
-    .listing-category-title {
-      font-size: 1.1rem;
-      text-transform: lowercase;
-      color: var(--text);
-      font-weight: bold;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.5rem;
-      padding-bottom: 0.35rem;
-      border-bottom: 2px solid var(--accent);
-      border-image: linear-gradient(to right, var(--accent), transparent) 1;
-    }
+.listing-category-title {
+  font-size: 1.1rem;
+  text-transform: lowercase;
+  color: var(--text);
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+}
 
     .listing-title {
       font-weight: bold;
@@ -80,5 +78,47 @@
         margin: 0 0.3rem;
       }
     }
+  }
+
+  .project-category {
+    margin-bottom: 2rem;
+  }
+
+  .project-category-title {
+    font-size: 1.2rem;
+    color: var(--text);
+    margin-bottom: 1rem;
+  }
+
+  .project-company {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-style: italic;
+  }
+
+  .professional-projects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .professional-project {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+    
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .professional-project-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .private-projects-list {
+    /* Status grouping styles already applied */
   }
 }

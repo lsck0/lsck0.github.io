@@ -7,7 +7,6 @@ tags: cs, plt, math
 publication: cs
 project: plt
 sources: https://en.wikipedia.org/wiki/Curry%E2%80%93Howard_correspondence
-date: 2026-02-15
 ---
 
 The **Curry-Howard correspondence** reveals that types are propositions, programs are proofs, and computation is proof simplification.

@@ -35,7 +35,7 @@ struct LabeledBlock {
     kind: String,
     title: String,
     aliases: Vec<String>,
-    number: u32,
+    number: String,
     content: String,
 }
 
@@ -56,13 +56,14 @@ pub fn include_posts_impl(_input: TokenStream) -> TokenStream {
     // Extract labeled blocks from all posts
     let mut blocks_per_post: Vec<Vec<LabeledBlock>> = Vec::new();
     for post in &mut posts {
-        let (new_body, blocks) = extract_labeled_blocks(&post.body);
+        let has_toc = post.metadata.get("toc").is_some_and(|v| v == "true");
+        let (new_body, blocks) = extract_labeled_blocks(&post.body, has_toc);
         post.body = new_body;
         blocks_per_post.push(blocks);
     }
 
     // Build global label registry: label -> (slug, kind, title, number, content)
-    let registry: HashMap<String, (String, String, String, u32, String)> = posts
+    let registry: HashMap<String, (String, String, String, String, String)> = posts
         .iter()
         .zip(blocks_per_post.iter())
         .flat_map(|(post, blocks)| {
@@ -75,7 +76,7 @@ pub fn include_posts_impl(_input: TokenStream) -> TokenStream {
                             post.slug.clone(),
                             block.kind.clone(),
                             block.title.clone(),
-                            block.number,
+                            block.number.clone(),
                             block.content.clone(),
                         ),
                     )
@@ -162,7 +163,7 @@ fn emit_post_tokens(post: &ParsedPost, blocks: &[LabeledBlock]) -> proc_macro2::
         let label = &block.label;
         let kind = &block.kind;
         let title = &block.title;
-        let number = block.number;
+        let number = &block.number;
         let content = &block.content;
 
         quote! {
@@ -194,7 +195,7 @@ fn emit_post_tokens(post: &ParsedPost, blocks: &[LabeledBlock]) -> proc_macro2::
 // Labeled blocks (```kind Title {#label} ... ```)
 // ============================================================
 
-fn extract_labeled_blocks(body: &str) -> (String, Vec<LabeledBlock>) {
+fn extract_labeled_blocks(body: &str, has_toc: bool) -> (String, Vec<LabeledBlock>) {
     let all_kinds: Vec<&str> = NUMBERED_KINDS
         .iter()
         .chain(UNNUMBERED_KINDS.iter())
@@ -203,12 +204,27 @@ fn extract_labeled_blocks(body: &str) -> (String, Vec<LabeledBlock>) {
         .collect();
     let mut blocks = Vec::new();
     let mut result = String::new();
-    let mut counter: u32 = 0;
+    let mut global_counter: u32 = 0;
+    let mut section_counter: u32 = 0;
+    let mut section: [u32; 3] = [0, 0, 0]; // h1, h2, h3 counters for chapter-scoped numbering
     let lines: Vec<&str> = body.lines().collect();
     let mut i = 0;
 
     while i < lines.len() {
         let trimmed = lines[i].trim();
+
+        // Track heading levels for chapter-scoped numbering
+        if has_toc && trimmed.starts_with('#') {
+            let level = trimmed.chars().take_while(|&c| c == '#').count();
+            if (1..=3).contains(&level) {
+                let idx = level - 1;
+                section[idx] += 1;
+                for s in &mut section[idx + 1..] {
+                    *s = 0;
+                }
+                section_counter = 0;
+            }
+        }
 
         // Check for backtick-fenced block: ```kind or ````kind etc.
         if let Some((fence_len, rest)) = parse_backtick_fence(trimmed)
@@ -218,14 +234,34 @@ fn extract_labeled_blocks(body: &str) -> (String, Vec<LabeledBlock>) {
             let is_callout = CALLOUT_KINDS.contains(&kind.as_str());
             let is_numbered = NUMBERED_KINDS.contains(&kind.as_str());
             let number = if is_numbered {
-                counter += 1;
-                counter
+                if has_toc && section[0] > 0 {
+                    section_counter += 1;
+                    // Build section-scoped number like "1.1", "1.2.1"
+                    let depth = if section[2] > 0 {
+                        3
+                    } else if section[1] > 0 {
+                        2
+                    } else {
+                        1
+                    };
+                    let mut parts: Vec<String> = section[..depth].iter().map(|n| n.to_string()).collect();
+                    parts.push(section_counter.to_string());
+                    parts.join(".")
+                } else {
+                    global_counter += 1;
+                    global_counter.to_string()
+                }
             } else {
-                0
+                String::new()
             };
 
-            let label = label_opt
-                .unwrap_or_else(|| format!("{}-{}", kind, if is_numbered { number } else { blocks.len() as u32 }));
+            let label = label_opt.unwrap_or_else(|| {
+                if is_numbered {
+                    format!("{}-{}", kind, number)
+                } else {
+                    format!("{}-{}", kind, blocks.len())
+                }
+            });
 
             // Collect content until matching closing fence (same or more backticks)
             i += 1;
@@ -256,7 +292,7 @@ fn extract_labeled_blocks(body: &str) -> (String, Vec<LabeledBlock>) {
                     kind: kind.clone(),
                     title: title.clone(),
                     aliases,
-                    number,
+                    number: number.clone(),
                     content: content.clone(),
                 });
 
@@ -345,7 +381,7 @@ fn parse_block_header(header: &str) -> Option<(String, String, Vec<String>, Opti
 fn resolve_cross_references(
     body: &str,
     current_slug: &str,
-    registry: &HashMap<String, (String, String, String, u32, String)>,
+    registry: &HashMap<String, (String, String, String, String, String)>,
 ) -> String {
     let mut result = String::new();
     let mut remaining = body;
@@ -380,7 +416,8 @@ fn resolve_cross_references(
             if let Some((slug, kind, title, number, content)) = registry.get(label) {
                 let html_id = label.replace(':', "-");
                 let effective_slug = target_slug_override.unwrap_or(slug.as_str());
-                let href = if effective_slug == current_slug {
+                let is_same_page = effective_slug == current_slug;
+                let href = if is_same_page {
                     format!("#{html_id}")
                 } else {
                     format!("/blog/{effective_slug}#{html_id}")
@@ -389,13 +426,23 @@ fn resolve_cross_references(
                 let display_text = if let Some(custom) = custom_display {
                     custom.to_string()
                 } else {
-                    default_xref_display(kind, title, *number)
+                    default_xref_display(kind, title, number)
                 };
 
                 let escaped_preview = escape_for_attribute(content);
+                let target_attr = if is_same_page {
+                    ""
+                } else {
+                    " target=\"_blank\" rel=\"noopener\""
+                };
 
+                let escaped_title = escape_for_attribute(title);
                 result.push_str(&format!(
-                    "<a class=\"xref\" href=\"{href}\" data-preview=\"{escaped_preview}\">{display_text}</a>"
+                    "<a class=\"xref\" href=\"{href}\" \
+                     data-preview=\"{escaped_preview}\" \
+                     data-block-label=\"{label}\" data-block-kind=\"{kind}\" \
+                     data-block-title=\"{escaped_title}\" \
+                     data-block-number=\"{number}\"{target_attr}>{display_text}</a>"
                 ));
             } else {
                 result.push_str(&format!(
@@ -417,7 +464,7 @@ fn resolve_cross_references(
 fn resolve_cross_references_preview(
     content: &str,
     _self_label: &str,
-    registry: &HashMap<String, (String, String, String, u32, String)>,
+    registry: &HashMap<String, (String, String, String, String, String)>,
 ) -> String {
     let mut result = String::new();
     let mut remaining = content;
@@ -438,7 +485,7 @@ fn resolve_cross_references_preview(
                 let display = if let Some(custom) = custom_display {
                     custom.to_string()
                 } else {
-                    default_xref_display(kind, title, *number)
+                    default_xref_display(kind, title, number)
                 };
                 result.push_str(&display);
             } else {
@@ -463,10 +510,9 @@ struct TermEntry {
     title_lower: String,
     label: String,
     slug: String,
-    #[allow(dead_code)]
     kind: String,
-    #[allow(dead_code)]
     title: String,
+    number: String,
     preview: String,
 }
 
@@ -474,13 +520,13 @@ struct TermEntry {
 /// Terms are sorted longest-first so "normal subgroup" matches before "subgroup".
 /// Includes extra entries for definition aliases.
 fn build_term_index(
-    registry: &HashMap<String, (String, String, String, u32, String)>,
+    registry: &HashMap<String, (String, String, String, String, String)>,
     alias_map: &HashMap<String, Vec<String>>,
 ) -> Vec<TermEntry> {
     let mut terms: Vec<TermEntry> = registry
         .iter()
         .filter(|(_, (_, kind, title, _, _))| !title.is_empty() && kind != "proof" && kind != "example")
-        .flat_map(|(label, (slug, kind, title, _number, content))| {
+        .flat_map(|(label, (slug, kind, title, number, content))| {
             let preview = escape_for_attribute(content);
             let title_lower = title.to_lowercase();
             let mut entries = vec![TermEntry {
@@ -489,6 +535,7 @@ fn build_term_index(
                 slug: slug.clone(),
                 kind: kind.clone(),
                 title: title.clone(),
+                number: number.clone(),
                 preview: preview.clone(),
             }];
 
@@ -509,6 +556,7 @@ fn build_term_index(
                 slug: slug.clone(),
                 kind: kind.clone(),
                 title: format!("{}s", title),
+                number: number.clone(),
                 preview: preview.clone(),
             });
 
@@ -521,6 +569,7 @@ fn build_term_index(
                         slug: slug.clone(),
                         kind: kind.clone(),
                         title: alias.clone(),
+                        number: number.clone(),
                         preview: preview.clone(),
                     });
                 }
@@ -536,13 +585,13 @@ fn build_term_index(
 }
 
 /// Auto-link defined terms in a post's body text.
-/// Only the first occurrence of each term per post is linked.
+/// Every occurrence of each term per post is linked.
 /// Skips: HTML tags, comments, inline code, math, and existing xref/auto-def spans.
 fn auto_link_definitions(
     body: &str,
     current_slug: &str,
     terms: &[TermEntry],
-    _registry: &HashMap<String, (String, String, String, u32, String)>,
+    _registry: &HashMap<String, (String, String, String, String, String)>,
 ) -> String {
     if terms.is_empty() {
         return body.to_string();
@@ -562,7 +611,9 @@ fn auto_link_definitions(
 
         // Check if current position is a word boundary (start of a potential term)
         if is_word_start(body, pos) {
-            let mut matched = false;
+            // Find the longest matching term at this position
+            let mut best_match: Option<(usize, &TermEntry)> = None;
+
             for term in terms {
                 let end = pos + term.title_lower.len();
                 if end > body.len() {
@@ -572,36 +623,54 @@ fn auto_link_definitions(
                     continue;
                 }
                 if body_lower[pos..end] == term.title_lower && is_word_end(body, end) {
-                    // Link every occurrence, not just first
-                    // if linked.contains(&term.label) {
-                    //     continue;
-                    // }
-
-                    let original = &body[pos..end];
-                    let html_id = term.label.replace(':', "-");
-                    let href = if term.slug == current_slug {
-                        format!("#{html_id}")
-                    } else {
-                        format!("/blog/{}#{html_id}", term.slug)
-                    };
-                    result.push_str(&format!(
-                        "<a class=\"auto-def\" href=\"{href}\" data-preview=\"{}\">{original}</a>",
-                        term.preview
-                    ));
-                    pos = end;
-                    matched = true;
-                    break;
+                    // Keep track of the longest match
+                    if best_match.is_none() || end > best_match.unwrap().0 {
+                        best_match = Some((end, term));
+                    }
                 }
             }
-            if matched {
-                continue;
-            }
-        }
 
-        // Advance one character (handle multi-byte UTF-8)
-        let ch = body[pos..].chars().next().unwrap();
-        result.push(ch);
-        pos += ch.len_utf8();
+            if let Some((end, term)) = best_match {
+                let original = &body[pos..end];
+                let html_id = term.label.replace(':', "-");
+                let is_same_page = term.slug == current_slug;
+                let href = if is_same_page {
+                    format!("#{html_id}")
+                } else {
+                    format!("/blog/{}#{html_id}", term.slug)
+                };
+                let target_attr = if is_same_page {
+                    ""
+                } else {
+                    " target=\"_blank\" rel=\"noopener\""
+                };
+                let kind_class = match term.kind.as_str() {
+                    "definition" => "auto-def",
+                    "theorem" | "lemma" | "corollary" | "proposition" => "auto-thm",
+                    _ => "auto-def",
+                };
+                let escaped_title = escape_for_attribute(&term.title);
+                result.push_str(&format!(
+                    "<a class=\"{kind_class}\" href=\"{href}\" \
+                     data-preview=\"{}\" \
+                     data-block-label=\"{}\" data-block-kind=\"{}\" \
+                     data-block-title=\"{escaped_title}\" \
+                     data-block-number=\"{}\"{target_attr}>{original}</a>",
+                    term.preview, term.label, term.kind, term.number
+                ));
+                pos = end;
+            } else {
+                // Advance one character (handle multi-byte UTF-8)
+                let ch = body[pos..].chars().next().unwrap();
+                result.push(ch);
+                pos += ch.len_utf8();
+            }
+        } else {
+            // Advance one character (handle multi-byte UTF-8)
+            let ch = body[pos..].chars().next().unwrap();
+            result.push(ch);
+            pos += ch.len_utf8();
+        }
     }
 
     return result;
@@ -616,9 +685,8 @@ fn skip_opaque_region(body: &str, pos: usize) -> Option<usize> {
         return remaining.find("-->").map(|end| end + 3);
     }
 
-    // Existing xref or auto-def tags: skip entire <a class="xref"...>...</a> or <a class="auto-def"...>...</a>
-    if remaining.starts_with("<a ")
-        && (remaining.contains("class=\"xref\"") || remaining.contains("class=\"auto-def\""))
+    // Any anchor tag: skip the entire <a ...>...</a> (links take precedence over auto-defs)
+    if (remaining.starts_with("<a ") || remaining.starts_with("<a>"))
         && let Some(close) = remaining.find("</a>")
     {
         return Some(close + 4);
@@ -648,6 +716,15 @@ fn skip_opaque_region(body: &str, pos: usize) -> Option<usize> {
     if remaining.starts_with('$') && remaining.len() > 1 && remaining.as_bytes()[1] != b'$' {
         let after = &remaining[1..];
         return after.find('$').map(|end| end + 2);
+    }
+
+    // Markdown links [text](url) — skip the entire link so auto-def doesn't break link text
+    if remaining.starts_with('[')
+        && !remaining.starts_with("[[")
+        && let Some(bracket_end) = remaining.find("](")
+        && let Some(paren_end) = remaining[bracket_end + 2..].find(')')
+    {
+        return Some(bracket_end + 2 + paren_end + 1);
     }
 
     return None;
@@ -684,12 +761,12 @@ fn escape_for_attribute(content: &str) -> String {
         .replace('\n', " ");
 }
 
-fn default_xref_display(kind: &str, title: &str, number: u32) -> String {
+fn default_xref_display(kind: &str, title: &str, number: &str) -> String {
     if !title.is_empty() {
         return title.to_string();
     }
     let kind_display = capitalize_first(kind);
-    if number > 0 {
+    if !number.is_empty() {
         format!("{kind_display} {number}")
     } else {
         kind_display

@@ -6,7 +6,6 @@ series_order: 4
 tags: cs, plt
 publication: cs
 project: plt
-date: 2026-02-28
 ---
 
 Hindley-Milner (HM) type inference lets the compiler figure out types for you. It powers OCaml, Haskell, and Rust's local inference.

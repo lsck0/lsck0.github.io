@@ -3,7 +3,6 @@ title: What Continuity Really Means
 description: From epsilon-delta to open sets.
 tags: math, topology, analysis
 publication: math
-date: 2026-02-18
 ---
 
 The epsilon-delta definition of continuity is familiar but hides the geometric intuition. Topology reveals what's really going on.

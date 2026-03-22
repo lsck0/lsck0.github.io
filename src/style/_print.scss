@@ -1,0 +1,209 @@
+// ---- Print stylesheet ----
+
+@media print {
+  // Hide non-content elements
+  .reading-progress,
+  .site-header,
+  .sidebar,
+  .site-footer,
+  .post-search,
+  .global-search-overlay,
+  .scroll-to-top,
+  .bookmark-btn,
+  .print-btn,
+  .giscus-container,
+  .series-prev-next,
+  .marquee-container,
+  .draft-banner,
+  .copy-btn,
+  .math-copy-btn {
+    display: none !important;
+  }
+
+  // Reset layout
+  body {
+    padding: 0;
+    margin: 0;
+    font-size: 7pt;
+    line-height: 1.4;
+    color: #000;
+    background: #fff;
+  }
+
+  .page-layout {
+    display: block;
+  }
+
+  main {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  // Post content
+  .post-title {
+    font-size: 12pt;
+    color: #000;
+  }
+
+  .post-subtitle {
+    font-size: 8pt;
+    color: #333;
+  }
+
+  .post-meta {
+    color: #555;
+    font-size: 6pt;
+  }
+
+  .content {
+    font-size: 7pt;
+
+    h1 { font-size: 11pt; }
+    h2 { font-size: 9pt; }
+    h3 { font-size: 8pt; }
+
+    a {
+      color: #000;
+      text-decoration: underline;
+
+      &::after {
+        content: " (" attr(href) ")";
+        font-size: 0.75em;
+        color: #555;
+      }
+
+      // Don't expand internal fragment links or internal links
+      &[href^="#"]::after,
+      &[href^="/"]::after {
+        content: none;
+      }
+    }
+
+    pre {
+      border: none !important;
+      background: #f8f8f8 !important;
+      color: #000 !important;
+      font-size: 6pt;
+      padding: 0.3em 0.5em !important;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      box-shadow: none !important;
+      outline: none !important;
+    }
+
+    code {
+      border: none !important;
+      background: #f8f8f8 !important;
+      color: #000 !important;
+      font-size: 6pt;
+      box-shadow: none !important;
+    }
+
+    // Remove Prism token colors that create thin colored lines
+    pre code {
+      background: transparent !important;
+      border: none !important;
+
+      span {
+        color: #000 !important;
+        text-shadow: none !important;
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+    }
+
+    img {
+      max-width: 100%;
+      break-inside: avoid;
+    }
+
+    // Footnotes: don't float in print
+    .footnote-definition {
+      float: none !important;
+      width: auto !important;
+      margin-right: 0 !important;
+      border-left: none !important;
+    }
+  }
+
+  // Labeled blocks (definitions, theorems, etc.)
+  .labeled-block {
+    break-inside: avoid;
+    border-color: #999 !important;
+  }
+
+  // Table of Contents
+  .post-toc {
+    break-inside: avoid;
+    border-color: #ccc;
+  }
+
+  // References section
+  .post-references {
+    break-before: auto;
+    font-size: 6pt;
+  }
+
+  // Headings should not be orphaned
+  h1, h2, h3, h4 {
+    break-after: avoid;
+  }
+
+  // TikZ diagrams: reset to natural flow for print
+  .tikz-diagram {
+    break-inside: avoid;
+    height: auto !important;
+
+    svg {
+      filter: none !important;
+      position: static !important;
+    }
+
+    .page {
+      position: static !important;
+      height: auto !important;
+      width: auto !important;
+      transform: none !important;
+    }
+  }
+
+  // Mermaid: ensure visible in print
+  .mermaid {
+    break-inside: avoid;
+    overflow: visible !important;
+    cursor: default !important;
+
+    svg {
+      filter: none !important;
+      transform: none !important;
+      max-width: 100%;
+    }
+  }
+
+  // Remove hover underlines from auto-linked definitions
+  .auto-def,
+  .auto-thm,
+  .xref {
+    background-image: none !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+  }
+
+  // Page margins
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+
+  // Math display
+  .math-display {
+    break-inside: avoid;
+  }
+
+  // KaTeX force black text
+  .katex {
+    color: #000 !important;
+  }
+}

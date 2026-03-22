@@ -2,7 +2,6 @@
 title: Tools I Use
 description: My current development setup.
 tags: notes, tools
-date: 2026-02-10
 ---
 
 A snapshot of what I'm using day to day. This changes, but slowly.

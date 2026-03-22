@@ -1,12 +1,3 @@
-# Allow search engines for SEO
-User-agent: Googlebot
-Allow: /
-User-agent: Bingbot
-Allow: /
-User-agent: DuckDuckBot
-Allow: /
-
-# Block AI crawlers
 User-agent: AdsBot-Google
 Disallow: /
 User-agent: Amazonbot
@@ -48,7 +39,6 @@ Disallow: /
 User-agent: YouBot
 Disallow: /
 
-# Default: allow
 User-agent: *
 Allow: /
 

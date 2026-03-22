@@ -5,16 +5,17 @@
   padding: 4rem 0;
 
   .ascii-404 {
-    font-size: 0.6rem;
-    line-height: 1.1;
+    font-size: 1rem;
+    line-height: 1.2;
     color: var(--accent);
     margin-bottom: 1.5rem;
     display: block;
     font-family: monospace;
     white-space: pre;
+    letter-spacing: 0;
 
     @media (max-width: 480px) {
-      font-size: 0.35rem;
+      font-size: 0.8rem;
     }
   }
 

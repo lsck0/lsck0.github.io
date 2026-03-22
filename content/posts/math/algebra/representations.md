@@ -7,10 +7,9 @@ tags: math, algebra, representation-theory
 publication: math
 toc: true
 sources: https://en.wikipedia.org/wiki/Group_representation
-date: 2026-01-15
 ---
 
-Representation theory studies groups by letting them act on [[def:vector-space|vector spaces]]. This linearizes the problem, making tools from [[def:linear-map|linear algebra]] available. The classic references are Serre[^serre] and Fulton & Harris[^fh].
+Representation theory studies groups by letting them act on [[def:vector-space|vector spaces]]. This linearizes the problem, making tools from linear algebra available. The classic references are Serre[^serre] and Fulton & Harris[^fh].
 
 [^serre]: Jean-Pierre Serre, *Linear Representations of Finite Groups*, Springer, 1977.
 [^fh]: William Fulton & Joe Harris, *Representation Theory: A First Course*, Springer, 1991.

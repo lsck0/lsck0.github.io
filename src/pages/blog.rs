@@ -6,17 +6,13 @@ use leptos_router::{
     components::A,
     hooks::{use_navigate, use_query_map},
 };
-use nucleo_matcher::{
-    Matcher, Utf32Str,
-    pattern::{CaseMatching, Normalization, Pattern},
-};
 
 use crate::{
     components::{
         layout::Layout,
         storage::{is_bookmarked, is_read, set_bookmarked},
     },
-    models::{meta::META, post::POSTS},
+    models::{meta::META, post::POSTS, search::fuzzy_score},
     pages::graph::GraphView,
 };
 
@@ -40,23 +36,6 @@ enum ViewMode {
     Series,
     Graph,
     Bookmarks,
-}
-
-// ============================================================
-// Fuzzy search
-// ============================================================
-
-fn fuzzy_score(query: &str, text: &str) -> Option<u32> {
-    let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
-    let pattern = Pattern::new(
-        query,
-        CaseMatching::Ignore,
-        Normalization::Smart,
-        nucleo_matcher::pattern::AtomKind::Fuzzy,
-    );
-    let mut buf = Vec::new();
-    let haystack = Utf32Str::new(text, &mut buf);
-    pattern.score(haystack, &mut matcher)
 }
 
 // ============================================================
@@ -183,12 +162,12 @@ pub fn BlogPage() -> impl IntoView {
                 .filter_map(|(index, post)| {
                     let title_score = fuzzy_score(&query_text, post.title()).map(|score| score.saturating_mul(3));
                     let body_score = fuzzy_score(&query_text, post.body);
-                    let best = match (title_score, body_score) {
-                        (Some(title), Some(body)) => Some(title.max(body)),
-                        (Some(title), None) => Some(title),
-                        (None, Some(body)) => Some(body),
-                        (None, None) => None,
-                    };
+                    let block_text = post.labeled_block_text();
+                    let block_score = fuzzy_score(&query_text, &block_text).map(|score| score.saturating_mul(2));
+                    let best = [title_score, body_score, block_score]
+                        .into_iter()
+                        .flatten()
+                        .max();
                     best.map(|score| (index, score))
                 })
                 .collect();
@@ -236,7 +215,10 @@ pub fn BlogPage() -> impl IntoView {
 
     return view! {
         <Title text=META.page_title("blog") />
-        <Meta name="description" content=META.page("blog").map(|page| page.description).unwrap_or("") />
+        <Meta
+            name="description"
+            content=META.page("blog").map(|page| page.description).unwrap_or("")
+        />
         <Layout>
             <div class="blog-page">
 
@@ -251,12 +233,12 @@ pub fn BlogPage() -> impl IntoView {
                         />
                         <span class="blog-count">
                             {move || {
-                                let total = POSTS.len();
-                                let filtered = filtered_posts().len();
                                 if has_active_filters() {
+                                    let total = POSTS.len();
+                                    let filtered = filtered_posts().len();
                                     format!("{filtered}/{total}")
                                 } else {
-                                    format!("{total}")
+                                    String::new()
                                 }
                             }}
                         </span>
@@ -396,7 +378,10 @@ fn render_list_view(
                                 <button
                                     class="page-btn"
                                     disabled=move || page.get() == 0
-                                    on:click=move |_| set_page.update(|current| *current = current.saturating_sub(1))
+                                    on:click=move |_| {
+                                        set_page
+                                            .update(|current| *current = current.saturating_sub(1))
+                                    }
                                 >
                                     "\u{2190} prev"
                                 </button>
@@ -541,7 +526,10 @@ fn render_series_view(
                     .into_iter()
                     .map(|(name, series_posts)| {
                         let total = series_posts.len();
-                        let read_count = series_posts.iter().filter(|post| is_read(post.slug)).count();
+                        let read_count = series_posts
+                            .iter()
+                            .filter(|post| is_read(post.slug))
+                            .count();
                         let is_collapsed = collapsed.contains(&name);
                         let name_key = name.clone();
                         let icon = if is_collapsed { "\u{25b6}" } else { "\u{25bc}" };

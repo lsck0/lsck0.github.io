@@ -25,7 +25,11 @@ pub fn include_projects_impl(_input: TokenStream) -> TokenStream {
             let table = entry.as_table().expect("each [[projects]] entry must be a table");
             let title = toml_segments_to_tokens(table.get("title").expect("project missing 'title'"));
             let description = toml_segments_to_tokens(table.get("description").expect("project missing 'description'"));
-            let url = toml_string_value(table, "url");
+            let url_string = table
+                .get("url")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
             let status_string = toml_string_value(table, "status");
             let status = match status_string.as_str() {
                 "maintained" => quote! { ProjectStatus::Maintained },
@@ -34,12 +38,25 @@ pub fn include_projects_impl(_input: TokenStream) -> TokenStream {
                 "abandoned" => quote! { ProjectStatus::Abandoned },
                 other => panic!("unknown project status: {:?}", other),
             };
+            let company = toml_string_value(table, "company");
+            let company_tokens = if company.is_empty() {
+                quote! { None }
+            } else {
+                quote! { Some(#company) }
+            };
+            let anonymous = table.get("anonymous").and_then(|v| v.as_bool()).unwrap_or(false);
+            let url_tokens = match &url_string {
+                Some(u) => quote! { Some(#u) },
+                None => quote! { None },
+            };
             quote! {
                 ProjectEntry {
                     title: #title,
                     description: #description,
-                    url: #url,
+                    url: #url_tokens,
                     status: #status,
+                    company: #company_tokens,
+                    anonymous: #anonymous,
                 }
             }
         })

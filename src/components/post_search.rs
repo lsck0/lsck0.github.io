@@ -1,7 +1,10 @@
 #![allow(clippy::needless_return)]
 
 use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 use wasm_bindgen::{JsCast, closure::Closure};
+
+use crate::models::{post::POSTS, search::fuzzy_score};
 
 // ============================================================
 // Component
@@ -9,21 +12,74 @@ use wasm_bindgen::{JsCast, closure::Closure};
 
 #[component]
 pub fn PostSearch() -> impl IntoView {
-    let (is_visible, set_visible) = signal(false);
     let (search_query, set_search_query) = signal(String::new());
     let (total_matches, set_total_matches) = signal(0usize);
     let (active_match_index, set_active_match_index) = signal(0usize);
+    let (is_visible, set_is_visible) = signal(false);
     let search_input_reference = NodeRef::<leptos::html::Input>::new();
 
-    register_keyboard_shortcuts(
-        is_visible,
-        set_visible,
-        set_search_query,
-        set_total_matches,
-        search_input_reference,
-    );
-
     track_query_and_highlight(search_query, set_total_matches, set_active_match_index);
+
+    // Keyboard shortcuts
+    {
+        Effect::new(move |_: Option<()>| {
+            let Some(window) = web_sys::window() else { return };
+            let on_keydown = Closure::<dyn FnMut(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
+                let key = event.key();
+                let ctrl = event.ctrl_key() || event.meta_key();
+
+                // Ctrl+F: open/focus in-page search
+                if ctrl && !event.shift_key() && (key == "f" || key == "F") {
+                    event.prevent_default();
+                    set_is_visible.set(true);
+                    // Defer focus to next frame so the input is rendered
+                    let input_ref = search_input_reference;
+                    request_animation_frame(move || {
+                        if let Some(input) = input_ref.get() {
+                            let _ = input.focus();
+                            input.select();
+                        }
+                    });
+                }
+
+                // Escape: close search
+                if key == "Escape" && is_visible.get() {
+                    event.prevent_default();
+                    set_is_visible.set(false);
+                    set_search_query.set(String::new());
+                    clear_highlights();
+                }
+
+                // Ctrl+N or Enter: next match (vim-like)
+                if is_visible.get() && ((ctrl && key == "n") || (key == "Enter" && !event.shift_key())) {
+                    event.prevent_default();
+                    let count = total_matches.get();
+                    if count > 0 {
+                        let next = active_match_index.get() % count + 1;
+                        set_active_match_index.set(next);
+                        scroll_to_match(next - 1);
+                    }
+                }
+
+                // Ctrl+Shift+N or Shift+Enter: previous match (vim-like)
+                if is_visible.get() && ((ctrl && key == "N") || (key == "Enter" && event.shift_key())) {
+                    event.prevent_default();
+                    let count = total_matches.get();
+                    if count > 0 {
+                        let current = active_match_index.get();
+                        let prev = if current <= 1 { count } else { current - 1 };
+                        set_active_match_index.set(prev);
+                        scroll_to_match(prev - 1);
+                    }
+                }
+            });
+            let keydown_handler: js_sys::Function = on_keydown.into_js_value().unchecked_into();
+            let _ = window.add_event_listener_with_callback("keydown", &keydown_handler);
+            on_cleanup(move || {
+                let _ = window.remove_event_listener_with_callback("keydown", &keydown_handler);
+            });
+        });
+    }
 
     let navigate_to_next_match = move |_| {
         let count = total_matches.get();
@@ -46,88 +102,45 @@ pub fn PostSearch() -> impl IntoView {
         scroll_to_match(previous_index - 1);
     };
 
-    let close_search = move |_| {
-        set_visible.set(false);
-        clear_highlights();
-        set_search_query.set(String::new());
-        set_total_matches.set(0);
-    };
-
     return view! {
-        <div class="post-search" style:display=move || if is_visible.get() { "flex" } else { "none" }>
-            <input
-                type="text"
-                placeholder="search in post..."
-                prop:value=search_query
-                on:input=move |event| set_search_query.set(event_target_value(&event))
-                node_ref=search_input_reference
-            />
-            <span class="search-count">
-                {move || format_match_counter(active_match_index.get(), total_matches.get(), search_query.get().len())}
-            </span>
-            <button on:click=navigate_to_previous_match title="Previous match">
-                {"\u{25b2}"}
-            </button>
-            <button on:click=navigate_to_next_match title="Next match">
-                {"\u{25bc}"}
-            </button>
-            <button on:click=close_search title="Close (Esc)">
-                {"\u{2715}"}
-            </button>
-        </div>
+        {move || {
+            is_visible
+                .get()
+                .then(|| {
+                    view! {
+                        <div class="post-search">
+                            <input
+                                type="text"
+                                placeholder="search in post..."
+                                prop:value=search_query
+                                on:input=move |event| {
+                                    set_search_query.set(event_target_value(&event))
+                                }
+                                node_ref=search_input_reference
+                            />
+                            <span class="search-count">
+                                {move || format_match_counter(
+                                    active_match_index.get(),
+                                    total_matches.get(),
+                                    search_query.get().len(),
+                                )}
+                            </span>
+                            <button on:click=navigate_to_previous_match title="Previous match">
+                                {"\u{25b2}"}
+                            </button>
+                            <button on:click=navigate_to_next_match title="Next match">
+                                {"\u{25bc}"}
+                            </button>
+                        </div>
+                    }
+                })
+        }}
     };
 }
 
 // ============================================================
 // Effects
 // ============================================================
-
-fn register_keyboard_shortcuts(
-    is_visible: ReadSignal<bool>,
-    set_visible: WriteSignal<bool>,
-    set_search_query: WriteSignal<String>,
-    set_total_matches: WriteSignal<usize>,
-    search_input_reference: NodeRef<leptos::html::Input>,
-) {
-    Effect::new(move |_: Option<()>| {
-        let Some(window) = web_sys::window() else { return };
-
-        let on_keydown = Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
-            let is_toggle_shortcut = (event.ctrl_key() || event.meta_key()) && event.shift_key() && event.key() == "f";
-
-            if is_toggle_shortcut {
-                event.prevent_default();
-                set_visible.update(|visible| *visible = !*visible);
-
-                if is_visible.get_untracked() {
-                    leptos::task::spawn_local(async move {
-                        if let Some(input) = search_input_reference.get() {
-                            let _ = input.focus();
-                        }
-                    });
-                } else {
-                    reset_search(set_search_query, set_total_matches);
-                }
-            }
-
-            if event.key() == "Escape" && is_visible.get_untracked() {
-                set_visible.set(false);
-                reset_search(set_search_query, set_total_matches);
-            }
-        });
-
-        let keydown_handler: js_sys::Function = on_keydown.into_js_value().unchecked_into();
-        window
-            .add_event_listener_with_callback("keydown", &keydown_handler)
-            .unwrap();
-
-        on_cleanup(move || {
-            if let Some(window) = web_sys::window() {
-                let _ = window.remove_event_listener_with_callback("keydown", &keydown_handler);
-            }
-        });
-    });
-}
 
 fn track_query_and_highlight(
     search_query: ReadSignal<String>,
@@ -157,12 +170,6 @@ fn track_query_and_highlight(
 // ============================================================
 // Helpers
 // ============================================================
-
-fn reset_search(set_search_query: WriteSignal<String>, set_total_matches: WriteSignal<usize>) {
-    clear_highlights();
-    set_search_query.set(String::new());
-    set_total_matches.set(0);
-}
 
 fn format_match_counter(active_index: usize, total: usize, query_length: usize) -> String {
     if total > 0 {
@@ -252,4 +259,188 @@ fn scroll_to_match(index: usize) {
             }}
         }})()"#,
     ));
+}
+
+// ============================================================
+// Global search (Ctrl+Shift+F) — searches across ALL posts
+// ============================================================
+
+#[component]
+pub fn GlobalSearch() -> impl IntoView {
+    let (query, set_query) = signal(String::new());
+    let (is_visible, set_is_visible) = signal(false);
+    let (selected_index, set_selected_index) = signal(0usize);
+    let search_input_ref = NodeRef::<leptos::html::Input>::new();
+    let navigate = use_navigate();
+    let nav_for_effect = navigate.clone();
+
+    let results = move || {
+        let q = query.get();
+        if q.len() < 2 {
+            return Vec::new();
+        }
+        let mut scored: Vec<(usize, u32)> = POSTS
+            .iter()
+            .enumerate()
+            .filter_map(|(i, post)| {
+                let title_score = fuzzy_score(&q, post.title()).map(|s| s.saturating_mul(3));
+                let desc_score = fuzzy_score(&q, post.description());
+                let block_text = post.labeled_block_text();
+                let block_score = fuzzy_score(&q, &block_text).map(|s| s.saturating_mul(2));
+                let best = [title_score, desc_score, block_score]
+                    .into_iter()
+                    .flatten()
+                    .max();
+                best.map(|score| (i, score))
+            })
+            .collect();
+        scored.sort_by_key(|e| std::cmp::Reverse(e.1));
+        scored.truncate(10);
+        scored
+    };
+
+    // Keyboard shortcuts
+    Effect::new(move |_: Option<()>| {
+        let Some(window) = web_sys::window() else { return };
+        let navigate = nav_for_effect.clone();
+        let on_keydown = Closure::<dyn FnMut(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
+            let key = event.key();
+            let ctrl = event.ctrl_key() || event.meta_key();
+
+            // Ctrl+Shift+F: open global search
+            if ctrl && event.shift_key() && (key == "f" || key == "F") {
+                event.prevent_default();
+                set_is_visible.set(true);
+                let input_ref = search_input_ref;
+                request_animation_frame(move || {
+                    if let Some(input) = input_ref.get() {
+                        let _ = input.focus();
+                        input.select();
+                    }
+                });
+            }
+
+            if !is_visible.get() {
+                return;
+            }
+
+            // Escape: close
+            if key == "Escape" {
+                event.prevent_default();
+                set_is_visible.set(false);
+                set_query.set(String::new());
+            }
+
+            // Ctrl+N or Down: next result
+            if (ctrl && key == "n") || key == "ArrowDown" {
+                event.prevent_default();
+                set_selected_index.update(|i| *i = i.saturating_add(1).min(9));
+            }
+
+            // Ctrl+Shift+N or Up: previous result
+            if (ctrl && key == "N") || key == "ArrowUp" {
+                event.prevent_default();
+                set_selected_index.update(|i| *i = i.saturating_sub(1));
+            }
+
+            // Enter: navigate to selected post
+            if key == "Enter" {
+                event.prevent_default();
+                let r = results();
+                let idx = selected_index.get();
+                if let Some(&(post_idx, _)) = r.get(idx)
+                    && let Some(post) = POSTS.get(post_idx)
+                {
+                    let href = format!("/blog/{}", post.slug);
+                    set_is_visible.set(false);
+                    set_query.set(String::new());
+                    navigate(&href, Default::default());
+                }
+            }
+        });
+        let handler: js_sys::Function = on_keydown.into_js_value().unchecked_into();
+        let _ = window.add_event_listener_with_callback("keydown", &handler);
+        on_cleanup(move || {
+            let _ = window.remove_event_listener_with_callback("keydown", &handler);
+        });
+    });
+
+    // Reset selected index when query changes
+    Effect::new(move |_: Option<()>| {
+        let _ = query.get();
+        set_selected_index.set(0);
+    });
+
+    let nav_for_view = navigate.clone();
+    return view! {
+        {move || {
+            is_visible
+                .get()
+                .then(|| {
+                    let nav = nav_for_view.clone();
+                    view! {
+                        <div
+                            class="global-search-overlay"
+                            on:click=move |_| {
+                                set_is_visible.set(false);
+                                set_query.set(String::new());
+                            }
+                        >
+                            <div
+                                class="global-search"
+                                on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
+                            >
+                                <input
+                                    type="text"
+                                    placeholder="search all posts..."
+                                    prop:value=query
+                                    on:input=move |event| set_query.set(event_target_value(&event))
+                                    node_ref=search_input_ref
+                                />
+                                <div class="global-search-results">
+                                    {move || {
+                                        let r = results();
+                                        let sel = selected_index.get();
+                                        if r.is_empty() && query.get().len() >= 2 {
+                                            return view! {
+                                                <div class="global-search-empty">"no matches"</div>
+                                            }
+                                                .into_any();
+                                        }
+                                        r.into_iter()
+                                            .enumerate()
+                                            .map(|(i, (post_idx, _score))| {
+                                                let post = &POSTS[post_idx];
+                                                let class = if i == sel {
+                                                    "global-search-item selected"
+                                                } else {
+                                                    "global-search-item"
+                                                };
+                                                let href = format!("/blog/{}", post.slug);
+                                                let nav = nav.clone();
+                                                view! {
+                                                    <div
+                                                        class=class
+                                                        on:click=move |_| {
+                                                            let h = href.clone();
+                                                            set_is_visible.set(false);
+                                                            set_query.set(String::new());
+                                                            nav(&h, Default::default());
+                                                        }
+                                                    >
+                                                        <span class="global-search-title">{post.title()}</span>
+                                                        <span class="global-search-slug">{post.slug}</span>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()
+                                            .into_any()
+                                    }}
+                                </div>
+                            </div>
+                        </div>
+                    }
+                })
+        }}
+    };
 }

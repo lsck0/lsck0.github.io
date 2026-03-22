@@ -7,7 +7,6 @@ tags: math, algebra
 publication: math
 toc: true
 sources: https://en.wikipedia.org/wiki/Field_(mathematics), https://en.wikipedia.org/wiki/Field_extension
-date: 2026-01-25
 ---
 
 Fields are the algebraic structures where division is possible. This treatment follows Lang[^lang] ch. V and Morandi[^morandi].

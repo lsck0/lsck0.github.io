@@ -118,7 +118,10 @@ pub fn Sidebar() -> impl IntoView {
                                             "padding-left: {}rem",
                                             depth as f32 * 0.75,
                                         );
-                                        if is_path_collapsed(&parent, &state.collapsed_folders.get()) {
+                                        if is_path_collapsed(
+                                            &parent,
+                                            &state.collapsed_folders.get(),
+                                        ) {
                                             format!("{padding}; display: none")
                                         } else {
                                             padding
@@ -166,7 +169,10 @@ pub fn Sidebar() -> impl IntoView {
                                             "padding-left: {}rem",
                                             depth as f32 * 0.75,
                                         );
-                                        if is_path_collapsed(&parent, &state.collapsed_folders.get()) {
+                                        if is_path_collapsed(
+                                            &parent,
+                                            &state.collapsed_folders.get(),
+                                        ) {
                                             format!("{padding}; display: none")
                                         } else {
                                             padding
@@ -223,80 +229,213 @@ pub fn Sidebar() -> impl IntoView {
                 class="file-tree"
                 style:display=move || if state.is_projects_open.get() { "block" } else { "none" }
             >
-                {ProjectStatus::all()
-                    .iter()
-                    .filter(|&&status| PROJECTS.iter().any(|entry| entry.status == status))
-                    .map(|&status| {
-                        let status_id = status.id().to_string();
-                        let status_id_for_click = status_id.clone();
-                        let status_id_for_icon = status_id.clone();
-                        let projects_for_status: Vec<_> = PROJECTS
-                            .iter()
-                            .filter(|entry| entry.status == status)
-                            .collect();
-                        let project_views = projects_for_status
-                            .into_iter()
-                            .map(|entry| {
-                                let current_status_id = status_id.clone();
-                                let title_plain = segments_plain_value(entry.title);
-                                let href = format!("/projects#{}", title_plain);
-                                let label = if segments_has_scrambled(entry.title) {
+                {
+                    let private_projects: Vec<_> = PROJECTS
+                        .iter()
+                        .filter(|e| !e.is_professional())
+                        .collect();
+                    let professional_projects: Vec<_> = PROJECTS
+                        .iter()
+                        .filter(|e| e.is_professional())
+                        .collect();
+                    let private_status_views: Vec<_> = ProjectStatus::all()
+                        .iter()
+                        .filter(|&&status| {
+                            private_projects.iter().any(|entry| entry.status == status)
+                        })
+                        .map(|&status| {
+                            let status_id = format!("private-{}", status.id());
+                            let status_id_for_click = status_id.clone();
+                            let status_id_for_icon = status_id.clone();
+                            let projects_for_status: Vec<_> = private_projects
+                                .iter()
+                                .filter(|entry| entry.status == status)
+                                .copied()
+                                .collect();
+                            let project_views = projects_for_status
+                                .into_iter()
+                                .map(|entry| {
+                                    let current_status_id = status_id.clone();
+                                    let title_plain = segments_plain_value(entry.title);
+                                    let href = format!("/projects#{}", title_plain);
+                                    let label = if segments_has_scrambled(entry.title) {
+
+                                        // Private projects grouped by status
+                                        view! {
+                                            <span class="teaser">{render_segments(entry.title)}</span>
+                                        }
+                                            .into_any()
+                                    } else {
+                                        view! { {title_plain} }.into_any()
+                                    };
                                     view! {
-                                        <span class="teaser">{render_segments(entry.title)}</span>
+                                        <li
+                                            class="tree-post"
+                                            style:padding-left="2.25rem"
+                                            style:display=move || {
+                                                if state
+                                                    .collapsed_project_groups
+                                                    .get()
+                                                    .contains(&current_status_id)
+                                                {
+                                                    "none"
+                                                } else {
+                                                    "list-item"
+                                                }
+                                            }
+                                        >
+                                            <A href=href on:click=move |_| close_mobile()>
+                                                {label}
+                                            </A>
+                                        </li>
                                     }
-                                        .into_any()
-                                } else {
-                                    view! { {title_plain} }.into_any()
-                                };
-                                view! {
-                                    <li
-                                        class="tree-post"
-                                        style:padding-left="1.5rem"
-                                        style:display=move || {
-                                            if state.collapsed_project_groups.get().contains(&current_status_id) {
+                                })
+                                .collect_view();
+                            view! {
+                                <li
+                                    class="tree-folder"
+                                    style="padding-left: 1.5rem"
+                                    on:click=move |_| {
+                                        state
+                                            .collapsed_project_groups
+                                            .update(|set| {
+                                                if !set.remove(&status_id_for_click) {
+                                                    set.insert(status_id_for_click.clone());
+                                                }
+                                            });
+                                    }
+                                >
+                                    <span class="folder-icon">
+                                        {move || {
+                                            if state
+                                                .collapsed_project_groups
+                                                .get()
+                                                .contains(&status_id_for_icon)
+                                            {
+                                                "\u{25b8}"
+                                            } else {
+                                                "\u{25be}"
+                                            }
+                                        }}
+                                    </span>
+                                    {format!(" {}/", status.label())}
+                                </li>
+                                {project_views}
+                            }
+                        })
+                        .collect();
+                    let professional_views: Vec<_> = professional_projects
+                        .clone()
+                        .into_iter()
+                        .map(|entry| {
+                            let title_plain = segments_plain_value(entry.title);
+                            let href = format!("/projects#{}", title_plain);
+                            let label = if segments_has_scrambled(entry.title) {
+
+                                // Professional projects flat list
+                                view! { <span class="teaser">{render_segments(entry.title)}</span> }
+                                    .into_any()
+                            } else {
+                                view! { {title_plain} }.into_any()
+                            };
+                            view! {
+                                <li class="tree-post" style="padding-left: 1.5rem">
+                                    <A href=href on:click=move |_| close_mobile()>
+                                        {label}
+                                    </A>
+                                </li>
+                            }
+                        })
+                        .collect();
+
+                    view! {
+                        <>
+                            // Private Projects folder
+                            {(!private_projects.is_empty())
+                                .then(|| {
+                                    view! {
+                                        <li
+                                            class="tree-folder"
+                                            style="padding-left: 0.75rem"
+                                            on:click=move |_| {
+                                                state
+                                                    .collapsed_project_groups
+                                                    .update(|set| {
+                                                        if !set.remove("private") {
+                                                            set.insert("private".to_string());
+                                                        }
+                                                    });
+                                            }
+                                        >
+                                            <span class="folder-icon">
+                                                {move || {
+                                                    if state.collapsed_project_groups.get().contains("private")
+                                                    {
+                                                        "\u{25b8}"
+                                                    } else {
+                                                        "\u{25be}"
+                                                    }
+                                                }}
+                                            </span>
+                                            " private/"
+                                        </li>
+                                        <div style:display=move || {
+                                            if state.collapsed_project_groups.get().contains("private")
+                                            {
                                                 "none"
                                             } else {
-                                                "list-item"
+                                                "block"
                                             }
-                                        }
-                                    >
-                                        <A href=href on:click=move |_| close_mobile()>
-                                            {label}
-                                        </A>
-                                    </li>
-                                }
-                            })
-                            .collect_view();
-                        view! {
-                            <li
-                                class="tree-folder"
-                                style="padding-left: 0.75rem"
-                                on:click=move |_| {
-                                    state
-                                        .collapsed_project_groups
-                                        .update(|set| {
-                                            if !set.remove(&status_id_for_click) {
-                                                set.insert(status_id_for_click.clone());
+                                        }>{private_status_views}</div>
+                                    }
+                                })} // Professional Projects folder
+                            {(!professional_projects.is_empty())
+                                .then(|| {
+                                    view! {
+                                        <li
+                                            class="tree-folder"
+                                            style="padding-left: 0.75rem"
+                                            on:click=move |_| {
+                                                state
+                                                    .collapsed_project_groups
+                                                    .update(|set| {
+                                                        if !set.remove("professional") {
+                                                            set.insert("professional".to_string());
+                                                        }
+                                                    });
                                             }
-                                        });
-                                }
-                            >
-                                <span class="folder-icon">
-                                    {move || {
-                                        if state.collapsed_project_groups.get().contains(&status_id_for_icon)
-                                        {
-                                            "\u{25b8}"
-                                        } else {
-                                            "\u{25be}"
-                                        }
-                                    }}
-                                </span>
-                                {format!(" {}/", status.label())}
-                            </li>
-                            {project_views}
-                        }
-                    })
-                    .collect_view()}
+                                        >
+                                            <span class="folder-icon">
+                                                {move || {
+                                                    if state
+                                                        .collapsed_project_groups
+                                                        .get()
+                                                        .contains("professional")
+                                                    {
+                                                        "\u{25b8}"
+                                                    } else {
+                                                        "\u{25be}"
+                                                    }
+                                                }}
+                                            </span>
+                                            " professional/"
+                                        </li>
+                                        <div style:display=move || {
+                                            if state
+                                                .collapsed_project_groups
+                                                .get()
+                                                .contains("professional")
+                                            {
+                                                "none"
+                                            } else {
+                                                "block"
+                                            }
+                                        }>{professional_views}</div>
+                                    }
+                                })}
+                        </>
+                    }
+                }
             </ul>
 
             // ============================================================
@@ -333,7 +472,9 @@ pub fn Sidebar() -> impl IntoView {
 
             <ul
                 class="file-tree"
-                style:display=move || if state.is_publications_open.get() { "block" } else { "none" }
+                style:display=move || {
+                    if state.is_publications_open.get() { "block" } else { "none" }
+                }
             >
                 {PUBLICATIONS
                     .iter()

@@ -4,7 +4,7 @@ description: A first post demonstrating every content feature — LaTeX, TikZ, M
 tags: meta, math, cs
 project: lsck0.github.io
 sources: https://commonmark.org/help/, https://katex.org/docs/supported.html
-date: 2026-03-10
+toc: true
 ---
 
 Welcome to the blog. This post is a living showcase of everything the markdown engine supports. If you're writing a post and can't remember the syntax for something, this is the reference.
@@ -265,6 +265,22 @@ Use an iframe with the YouTube embed URL:
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allowfullscreen></iframe>
 
+## Callouts
+
+Callout blocks for extra information, warnings, and tips:
+
+```info
+This is an informational callout (blue). Use it for supplementary details.
+```
+
+```warning
+This is a warning callout (red). Use it for things to watch out for.
+```
+
+```tip
+This is a tip callout (green). Use it for helpful advice.
+```
+
 ## Horizontal rules
 
 Three dashes create a separator:
@@ -291,3 +307,11 @@ A few features are structural rather than per-post:
 - **Draft support** — add `draft: true` to frontmatter to exclude a post from the site
 - **OG meta tags** — the indexer generates per-post HTML with OpenGraph tags for social embeds
 - **RSS/Atom feeds** — available at `/rss.xml` and `/atom.xml`
+
+## Smart Embedding Test
+
+Testing smart embedding with a video link: [Test Video](/video/cat.mp4)
+
+Testing smart embedding with an audio link: [Test Audio](/audio/cat.mp3)
+
+Testing smart embedding with a PDF link: [Test PDF](/pdf/cohmology_weights.pdf)

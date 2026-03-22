@@ -2,13 +2,26 @@ use macros::include_posts;
 
 pub static POSTS: &[Post] = include_posts!();
 
+// ---- Date formatting ----
+
+fn format_date(date: &str) -> String {
+    let parts: Vec<&str> = date.split('-').collect();
+    if parts.len() != 3 {
+        return date.to_string();
+    }
+    let year = parts[0];
+    let month = parts[1];
+    let day = parts[2];
+    return format!("{day}.{month}.{year}");
+}
+
 // ---- Labeled blocks (definition, theorem, lemma, etc.) ----
 
 pub struct LabeledBlock {
     pub label: &'static str,
     pub kind: &'static str,
     pub title: &'static str,
-    pub number: u32,
+    pub number: &'static str,
     pub content: &'static str,
 }
 
@@ -25,19 +38,6 @@ pub struct Post {
     pub labeled_blocks: &'static [LabeledBlock],
 }
 
-// ---- Global block lookup ----
-
-pub fn find_block(label: &str) -> Option<(&'static Post, &'static LabeledBlock)> {
-    for post in POSTS {
-        for block in post.labeled_blocks {
-            if block.label == label {
-                return Some((post, block));
-            }
-        }
-    }
-    return None;
-}
-
 impl Post {
     fn metadata_field(&self, key: &str) -> Option<&'static str> {
         return self
@@ -52,7 +52,11 @@ impl Post {
     }
 
     pub fn date(&self) -> &'static str {
-        return self.metadata_field("date").unwrap_or("");
+        return self.metadata_field("created").unwrap_or("");
+    }
+
+    pub fn last_edited(&self) -> &'static str {
+        return self.metadata_field("last_edited").unwrap_or("");
     }
 
     pub fn tags(&self) -> Vec<&'static str> {
@@ -79,9 +83,7 @@ impl Post {
     }
 
     pub fn series_order(&self) -> Option<u32> {
-        return self
-            .metadata_field("series_order")
-            .and_then(|value| value.parse().ok());
+        return self.metadata_field("series_order").and_then(|value| value.parse().ok());
     }
 
     pub fn is_draft(&self) -> bool {
@@ -93,17 +95,21 @@ impl Post {
     }
 
     pub fn date_formatted(&self) -> String {
-        let date = self.date();
-        let parts: Vec<&str> = date.split('-').collect();
-        if parts.len() != 3 {
-            return date.to_string();
-        }
+        return format_date(self.date());
+    }
 
-        let year = parts[0];
-        let month = parts[1];
-        let day = parts[2];
+    pub fn last_edited_formatted(&self) -> String {
+        return format_date(self.last_edited());
+    }
 
-        return format!("{day}.{month}.{year}");
+    /// Concatenated text from all labeled block titles and labels, for search indexing.
+    pub fn labeled_block_text(&self) -> String {
+        return self
+            .labeled_blocks
+            .iter()
+            .flat_map(|block| [block.title, block.label, block.kind])
+            .collect::<Vec<_>>()
+            .join(" ");
     }
 
     // ---- Relations ----

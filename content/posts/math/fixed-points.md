@@ -4,7 +4,6 @@ description: When functions must have a point that maps to itself.
 tags: math, analysis
 publication: math
 sources: https://en.wikipedia.org/wiki/Banach_fixed-point_theorem, https://en.wikipedia.org/wiki/Brouwer_fixed-point_theorem
-date: 2026-02-20
 ---
 
 A **fixed point** of a function $f$ is a value $x$ where $f(x) = x$. Several deep theorems guarantee their existence.

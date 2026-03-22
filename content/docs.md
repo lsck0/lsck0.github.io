@@ -22,7 +22,6 @@ tags: rust, wasm, leptos
 publication: cs
 project: lsck0.github.io
 sources: https://example.com/ref1, https://example.com/ref2
-date: 2026-03-15
 draft: true
 toc: true
 ---
@@ -30,24 +29,32 @@ toc: true
 
 #### Required fields
 
-| Field   | Description                   |
-| ------- | ----------------------------- |
-| `title` | Display title of the post     |
-| `date`  | Publication date (YYYY-MM-DD) |
+| Field   | Description               |
+| ------- | ------------------------- |
+| `title` | Display title of the post |
+
+#### Automatic fields
+
+Dates are derived from git history at build time — no manual `date` field needed.
+
+| Field         | Source                        | Description                                       |
+| ------------- | ----------------------------- | ------------------------------------------------- |
+| `created`     | First git commit of the file  | Creation date, shown as the post date             |
+| `last_edited` | Latest git commit of the file | Last edit date, shown when different from created |
 
 #### Optional fields
 
-| Field          | Description                                                   |
-| -------------- | ------------------------------------------------------------- |
-| `description`  | Short summary shown under the title in the blog listing       |
-| `series`       | Name of a series — posts with the same name are grouped       |
-| `series_order` | Integer ordering within the series (ascending)                |
-| `tags`         | Comma-separated tags, used for filtering on `/blog`           |
-| `project`      | Links this post to a project entry                            |
-| `publication`  | Links this post to a publication entry                        |
-| `sources`      | Comma-separated URLs for references not linked in the body    |
-| `draft`        | Set to `true` to show only in dev mode with DRAFT banner      |
-| `toc`          | Set to `true` to show a collapsible table of contents         |
+| Field          | Description                                                |
+| -------------- | ---------------------------------------------------------- |
+| `description`  | Short summary shown under the title in the blog listing    |
+| `series`       | Name of a series — posts with the same name are grouped    |
+| `series_order` | Integer ordering within the series (ascending)             |
+| `tags`         | Comma-separated tags, used for filtering on `/blog`        |
+| `project`      | Links this post to a project entry                         |
+| `publication`  | Links this post to a publication entry                     |
+| `sources`      | Comma-separated URLs for references not linked in the body |
+| `draft`        | Set to `true` to show only in dev mode with DRAFT banner   |
+| `toc`          | Set to `true` to show a collapsible table of contents      |
 
 ### Content features
 
@@ -89,6 +96,9 @@ All special blocks show a copy button on hover that copies the source.
 
 Inline math with `$...$` and display math with `$$...$$`. Rendered via KaTeX.
 Display math blocks show a "copy tex" button on hover.
+
+Math in headings (`# Heading with $\alpha$`) renders correctly as KaTeX in both
+the heading and the table of contents.
 
 #### Labeled blocks (definitions, theorems, etc.)
 
@@ -170,6 +180,8 @@ Some text[^1] with a footnote.
 ```
 
 On wide screens (≥1200px), footnotes float into the right margin as sidenotes.
+On mobile devices, footnotes are grouped in a "Footnotes" section before the
+references and sources sections.
 
 #### Callouts / Admonitions
 
@@ -192,7 +204,7 @@ Or blockquote syntax:
 > This is a tip callout.
 ```
 
-Supported types: `tip` (green), `warning` (yellow), `danger` (red),
+Supported types: `tip` (green), `warning` (red), `danger` (red),
 `note` (accent), `info` (blue).
 
 #### Transclusion
@@ -212,16 +224,33 @@ Link to other posts using `/blog/{slug}`. The post page automatically shows:
 - **Internal references** — posts this post links to, with backlink markers
 - **External references** — external URLs linked in the body
 - **Sources** — URLs listed in the `sources` frontmatter field
-- **Referenced internally by** — other posts that link to this post
+- **Referenced internally by** — other posts that link to this post (including
+  cross-references)
 
 Each reference includes backlink markers (↑1, ↑2, ...) that scroll to where
-the link appears in the body.
+the link appears in the body. Backlinks work for both standard links and
+cross-references.
+
+#### Link behavior
+
+All links within post content open in a new tab. Navigation links (header,
+sidebar, footer) stay in the same tab.
 
 #### Link hover previews
 
+All links in posts and listing pages show a tooltip on hover that persists while
+the cursor is on the link or the tooltip itself. Tooltips support nested hovering:
+definitions within a hover can themselves be hovered to show stacked tooltips
+(up to 4 levels deep).
+
 - **Internal links**: show title, description, tags, and series info
-- **Cross-references**: show the block content with rendered math
-- **External links**: show favicon, domain, and URL path
+- **Cross-references**: show the block content with rendered math (including align,
+  gather, and equation environments)
+- **External links**: show favicon, domain, URL path, and pre-fetched OG metadata
+  (title, description, image) when available
+- **Site links**: show the link text and path
+- **Related posts** (in projects/publications): show post preview with title,
+  description, tags, and series info
 
 #### Series navigation
 
@@ -250,7 +279,7 @@ copies of their source code, making them findable via browser Ctrl+F search.
 
 - **Bookmark button** — SVG bookmark icon before the title
 - **Reading progress bar** — thin accent bar at viewport top
-- **In-post search** — Ctrl+Shift+F to search within the post content, with match highlighting and prev/next navigation
+- **In-post search** — Ctrl+F to search within the post content, with match highlighting and prev/next navigation
 - **Table of contents** — collapsible, auto-generated from h1/h2/h3 headings (opt-in via `toc: true`)
 - **Draft banner** — yellow "DRAFT" banner for draft posts (dev mode only)
 - **Scroll-to-top** — appears after scrolling past 50% viewport height
@@ -267,6 +296,7 @@ title = "/dev/lsck0"
 description = "computer science, mathematics, and software engineering"
 author = "Luca Sandrock"
 url = "https://lsck0.github.io"
+image = "https://lsck0.github.io/og-image.png"
 
 [pages.home]
 title = "/dev/lsck0"
@@ -277,6 +307,16 @@ title = "blog"
 description = "Posts on CS, math, and engineering."
 ```
 
+### Fields
+
+| Field         | Type   | Description                              |
+| ------------- | ------ | ---------------------------------------- |
+| `title`       | string | Site title                              |
+| `description` | string | Site description for meta tags           |
+| `author`      | string | Author name                             |
+| `url`         | string | Site URL (used for OG URLs)              |
+| `image`       | string | Default OG image URL (optional)          |
+
 Each page section provides a title and description used for `<title>` tags
 and meta descriptions.
 
@@ -284,30 +324,33 @@ and meta descriptions.
 
 The Makefile.toml defines three tasks:
 
-| Task       | Command                                           | Description                                    |
-| ---------- | ------------------------------------------------- | ---------------------------------------------- |
-| `dev`      | `trunk serve --port 3000 --open`                  | Development server with HMR                    |
-| `build`    | `trunk build --release` + wasm-opt + indexer + 404 | Production build (single source of truth)      |
-| `ci`       | clippy + fmt check + `makers build`               | CI validation                                  |
-| `wasm-opt` | wasm-opt with bulk-memory flags                   | Manual WASM optimization (called by `build`)   |
+| Task       | Command                                            | Description                                  |
+| ---------- | -------------------------------------------------- | -------------------------------------------- |
+| `dev`      | `trunk serve --port 3000 --open`                   | Development server with HMR                  |
+| `build`    | `trunk build --release` + wasm-opt + indexer + 404 | Production build (single source of truth)    |
+| `ci`       | clippy + fmt check + `makers build`                | CI validation                                |
+| `wasm-opt` | wasm-opt with bulk-memory flags                    | Manual WASM optimization (called by `build`) |
 
 ## Build-time Indexer
 
 Running `cargo run --package indexer` after `trunk build` generates:
 
-| File                           | Description                                  |
-| ------------------------------ | -------------------------------------------- |
-| `dist/graph.json`              | Node/edge graph of posts and their relations |
-| `dist/search_index.json`       | Search index with slug, title, tags, desc    |
-| `dist/rss.xml`                 | RSS 2.0 feed                                 |
-| `dist/atom.xml`                | Atom feed                                    |
-| `dist/sitemap.xml`             | Sitemap for search engines                   |
-| `dist/llms.txt`                | AI scraping opt-out file                     |
-| `dist/blog/{slug}/index.html`  | Per-post HTML with OG meta tags for embeds   |
+| File                          | Description                                  |
+| ----------------------------- | -------------------------------------------- |
+| `dist/graph.json`             | Node/edge graph of posts and their relations |
+| `dist/search_index.json`      | Search index with slug, title, tags, desc    |
+| `dist/rss.xml`                | RSS 2.0 feed                                 |
+| `dist/atom.xml`               | Atom feed                                    |
+| `dist/sitemap.xml`            | Sitemap for search engines                   |
+| `dist/llms.txt`               | AI scraping opt-out file                     |
+| `dist/og_external.json`       | Cached OG metadata for external links        |
+| `dist/blog/{slug}/index.html` | Per-post HTML with OG meta tags for embeds   |
+| `dist/{route}/index.html`     | Static route fallbacks for SPA direct nav    |
 
-The OG pages are copies of `index.html` with `<meta property="og:*">` and
-`<meta name="twitter:*">` tags injected, so social platform crawlers see correct
-metadata even though the site is client-side rendered.
+The OG pages are copies of `index.html` with site metadata from `meta.toml` replaced
+and `<meta property="og:*">`, `<meta name="twitter:*">` tags injected, so social
+platform crawlers see correct metadata even though the site is client-side rendered.
+Each post gets its own OG image (defaults to `/og-image.png` in the site root).
 
 ## Client State
 
@@ -315,11 +358,11 @@ Bookmark and read state is managed via localStorage through a centralized
 `components/storage` module. All pages use the same module — no duplicated
 localStorage access patterns.
 
-| Key pattern      | Value     | Description                |
-| ---------------- | --------- | -------------------------- |
-| `bookmark:{slug}` | `"1"`     | Post is bookmarked         |
-| `read:{slug}`     | timestamp | Post has been viewed        |
-| `theme`           | `"dark"` / `"light"` | Current theme  |
+| Key pattern       | Value                | Description          |
+| ----------------- | -------------------- | -------------------- |
+| `bookmark:{slug}` | `"1"`                | Post is bookmarked   |
+| `read:{slug}`     | timestamp            | Post has been viewed |
+| `theme`           | `"dark"` / `"light"` | Current theme        |
 
 ## Content Pipeline Architecture
 
@@ -351,7 +394,7 @@ status = "maintained"
 | ------------- | ------------------- | --------------------------------------------------- |
 | `title`       | string or segment[] | Project name                                        |
 | `description` | string or segment[] | Short description                                   |
-| `url`         | string              | Link (empty string for no link)                     |
+| `url`         | string (optional)   | Link (omit for no link)                             |
 | `status`      | string              | One of: `maintained`, `wip`, `planned`, `abandoned` |
 
 ### Text segments
@@ -389,6 +432,21 @@ date = "2026"
 | `date`        | string or segment[] | Publication year               |
 
 All text fields support the same segment array syntax as projects.
+
+## Print / PDF Export
+
+`Ctrl+P` or the print button triggers optimized print styles:
+
+- 9pt base font for compact output
+- TikZ diagrams forced visible (no dark-mode invert filter)
+- Mermaid diagrams re-rendered in light theme before print
+- Copy buttons, hover underlines, and navigation hidden
+- KaTeX math forced to black text
+
+## OpenSearch
+
+The site provides an OpenSearch description at `/opensearch.xml`, enabling browsers
+to add the blog's search as a search engine. The search URL points to `/blog?q={searchTerms}`.
 
 ## Anti-AI Measures
 

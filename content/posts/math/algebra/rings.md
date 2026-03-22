@@ -7,7 +7,6 @@ tags: math, algebra
 publication: math
 toc: true
 sources: https://en.wikipedia.org/wiki/Ring_(mathematics)
-date: 2026-01-30
 ---
 
 This post builds on the group theory developed in [Groups](/blog/math/group-theory). The treatment follows Lang[^lang] and Atiyah & Macdonald[^am].
@@ -41,7 +40,7 @@ Some authors do not require rings to have a multiplicative identity. In this ser
 ```
 
 ```axiom Ring Axioms {#ax:ring-axioms}
-\begin{aligned}
+$$\begin{aligned}
 a + (b + c) &= (a + b) + c && \text{(associativity)} \\
 a + b &= b + a && \text{(commutativity)} \\
 a + 0 &= a && \text{(identity)} \\
@@ -50,7 +49,7 @@ a(bc) &= (ab)c && \text{(associativity)} \\
 1 \cdot a &= a \cdot 1 = a && \text{(identity)} \\
 a(b + c) &= ab + ac && \text{(left distributivity)} \\
 (a + b)c &= ac + bc && \text{(right distributivity)}
-\end{aligned}
+\end{aligned}$$
 ```
 
 The hierarchy of algebraic structures:

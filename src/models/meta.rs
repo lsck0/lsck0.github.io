@@ -17,7 +17,11 @@ pub struct PageMeta {
 
 impl SiteMeta {
     pub fn page(&self, key: &str) -> Option<&'static PageMeta> {
-        return self.pages.iter().find(|(page_key, _)| *page_key == key).map(|(_, page_meta)| page_meta);
+        return self
+            .pages
+            .iter()
+            .find(|(page_key, _)| *page_key == key)
+            .map(|(_, page_meta)| page_meta);
     }
 
     /// Format a page title like: "λ /dev/lsck0 — page_title"

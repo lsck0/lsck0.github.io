@@ -2,7 +2,6 @@
 title: Notes on Writing Well
 description: Collected advice on clear technical writing.
 tags: writing, notes
-date: 2026-03-01
 ---
 
 Some principles I keep coming back to when writing.

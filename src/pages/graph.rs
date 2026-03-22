@@ -58,9 +58,9 @@ impl Camera {
 /// to have sufficient contrast against both dark (#080c12) and light (#ffffff)
 /// backgrounds. Uses golden angle (137.508°) to maximally spread hues.
 fn tag_hue(tag: &str) -> u32 {
-    let index = tag
-        .bytes()
-        .fold(0u32, |accumulator, byte| accumulator.wrapping_mul(31).wrapping_add(byte as u32));
+    let index = tag.bytes().fold(0u32, |accumulator, byte| {
+        accumulator.wrapping_mul(31).wrapping_add(byte as u32)
+    });
     return ((index as f64 * 137.508) % 360.0) as u32;
 }
 
@@ -476,9 +476,9 @@ fn draw_graph(
         }
         let is_hovered = hovered_node == Some(index);
         let is_neighbor = if let Some(hovered) = hovered_node {
-            edges
-                .iter()
-                .any(|edge| (edge.source == hovered && edge.target == index) || (edge.target == hovered && edge.source == index))
+            edges.iter().any(|edge| {
+                (edge.source == hovered && edge.target == index) || (edge.target == hovered && edge.source == index)
+            })
         } else {
             false
         };
@@ -798,6 +798,8 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
             let up_dragged = Rc::clone(&dragged_node);
             let up_origin = Rc::clone(&mouse_down_origin);
             let up_canvas = canvas.clone();
+            // Get navigate function outside the closure to avoid calling hooks in event handler
+            let navigate = leptos_router::hooks::use_navigate();
 
             let closure = Closure::<dyn FnMut(MouseEvent)>::new(move |event: MouseEvent| {
                 let (origin_x, origin_y) = *up_origin.borrow();
@@ -814,11 +816,7 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
                     if let Some(node_index) = find_node_at(&up_nodes.borrow(), &camera_ref, screen_x, screen_y) {
                         let slug = &up_nodes.borrow()[node_index].slug;
                         let href = format!("/blog/{slug}");
-                        if let Some(window) = web_sys::window()
-                            && let Some(location) = window.document().and_then(|document| document.location())
-                        {
-                            let _ = location.set_href(&href);
-                        }
+                        navigate(&href, Default::default());
                     }
                 }
 

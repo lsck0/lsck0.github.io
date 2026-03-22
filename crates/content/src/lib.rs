@@ -1,12 +1,14 @@
 #![allow(clippy::needless_return)]
 
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, fs, path::Path, process::Command};
+
+use anyhow::{Context, Result, bail};
 
 // ============================================================
 // Frontmatter field definitions
 // ============================================================
 
-pub const REQUIRED_FIELDS: &[&str] = &["title", "date"];
+pub const REQUIRED_FIELDS: &[&str] = &["title"];
 pub const OPTIONAL_FIELDS: &[&str] = &[
     "tags",
     "description",
@@ -38,7 +40,11 @@ impl ParsedPost {
     }
 
     pub fn date(&self) -> &str {
-        return self.metadata.get("date").map(|v| v.as_str()).unwrap_or("");
+        return self.metadata.get("created").map(|v| v.as_str()).unwrap_or("");
+    }
+
+    pub fn last_edited(&self) -> &str {
+        return self.metadata.get("last_edited").map(|v| v.as_str()).unwrap_or("");
     }
 
     pub fn tags(&self) -> Vec<&str> {
@@ -80,14 +86,14 @@ impl ParsedPost {
 
 pub fn parse_posts_directory(directory: &Path) -> Vec<ParsedPost> {
     let mut posts = Vec::new();
-    walk_directory(directory, directory, &mut posts);
+    walk_directory(directory, directory, &mut posts).unwrap_or_else(|e| panic!("failed to parse posts: {e:#}"));
     posts.sort_by(|a, b| b.date().cmp(a.date()));
     return posts;
 }
 
-fn walk_directory(directory: &Path, base_directory: &Path, posts: &mut Vec<ParsedPost>) {
+fn walk_directory(directory: &Path, base_directory: &Path, posts: &mut Vec<ParsedPost>) -> Result<()> {
     let mut entries = fs::read_dir(directory)
-        .unwrap_or_else(|_| panic!("failed to read directory: {}", directory.display()))
+        .with_context(|| format!("failed to read directory: {}", directory.display()))?
         .filter_map(|e| e.ok())
         .collect::<Vec<_>>();
 
@@ -96,26 +102,38 @@ fn walk_directory(directory: &Path, base_directory: &Path, posts: &mut Vec<Parse
     for entry in entries {
         let path = entry.path();
         if path.is_dir() {
-            walk_directory(&path, base_directory, posts);
+            walk_directory(&path, base_directory, posts)?;
         } else if path.extension().is_some_and(|ext| ext == "md") {
-            posts.push(parse_markdown_file(&path, base_directory));
+            let post = parse_markdown_file(&path, base_directory)
+                .with_context(|| format!("failed to parse: {}", path.display()))?;
+            posts.push(post);
         }
     }
+    return Ok(());
 }
 
-fn parse_markdown_file(file_path: &Path, base_directory: &Path) -> ParsedPost {
+fn parse_markdown_file(file_path: &Path, base_directory: &Path) -> Result<ParsedPost> {
     let mut content =
-        fs::read_to_string(file_path).unwrap_or_else(|_| panic!("failed to read: {}", file_path.display()));
+        fs::read_to_string(file_path).with_context(|| format!("failed to read: {}", file_path.display()))?;
     content = content.replace("\r\n", "\n");
 
-    let (metadata, body) = parse_frontmatter(&content, file_path);
+    let (mut metadata, body) = parse_frontmatter(&content, file_path)?;
 
-    let file_stem = file_path.file_stem().unwrap().to_string_lossy().to_string();
+    // Inject git-derived dates (created = first commit, last_edited = latest commit)
+    let (created, last_edited) = git_file_dates(file_path);
+    metadata.insert("created".to_string(), created);
+    metadata.insert("last_edited".to_string(), last_edited);
+
+    let file_stem = file_path
+        .file_stem()
+        .context("file has no stem")?
+        .to_string_lossy()
+        .to_string();
     let folder = file_path
         .parent()
-        .unwrap()
+        .context("file has no parent")?
         .strip_prefix(base_directory)
-        .unwrap()
+        .context("file not under base directory")?
         .to_string_lossy()
         .to_string();
 
@@ -128,42 +146,95 @@ fn parse_markdown_file(file_path: &Path, base_directory: &Path) -> ParsedPost {
     let internal_links = extract_internal_links(&body);
     let external_links = extract_external_links(&body);
 
-    return ParsedPost {
+    return Ok(ParsedPost {
         slug,
         folder,
         metadata,
         body,
         internal_links,
         external_links,
+    });
+}
+
+// ============================================================
+// Git date extraction
+// ============================================================
+
+/// Returns (created_date, last_edited_date) from git history for a file.
+fn git_file_dates(file_path: &Path) -> (String, String) {
+    let path_str = file_path.to_string_lossy().to_string();
+
+    let last_edited = Command::new("git")
+        .args(["log", "-1", "--format=%cd", "--date=short", "--", &path_str])
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|date| date.trim().to_string())
+        .filter(|date| !date.is_empty());
+
+    let created = Command::new("git")
+        .args([
+            "log",
+            "--diff-filter=A",
+            "--follow",
+            "--format=%cd",
+            "--date=short",
+            "--",
+            &path_str,
+        ])
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|date| date.trim().lines().last().unwrap_or("").trim().to_string())
+        .filter(|date| !date.is_empty());
+
+    let fallback = || {
+        fs::metadata(file_path)
+            .and_then(|meta| meta.modified())
+            .ok()
+            .and_then(|time| {
+                let duration = time.duration_since(std::time::UNIX_EPOCH).ok()?;
+                let secs = duration.as_secs();
+                let days = secs / 86400;
+                let years = 1970 + days / 365;
+                Some(format!("{years}-01-01"))
+            })
+            .unwrap_or_else(|| "2026-01-01".to_string())
     };
+
+    let created_date = created.unwrap_or_else(fallback);
+    let last_edited_date = last_edited.unwrap_or_else(|| created_date.clone());
+
+    return (created_date, last_edited_date);
 }
 
 // ============================================================
 // Frontmatter parsing
 // ============================================================
 
-pub fn parse_frontmatter(content: &str, source_path: &Path) -> (HashMap<String, String>, String) {
+pub fn parse_frontmatter(content: &str, source_path: &Path) -> Result<(HashMap<String, String>, String)> {
     let trimmed = content.trim_start();
     let display = source_path.display();
 
     let Some(mut remaining) = trimmed.strip_prefix("---\n") else {
-        panic!("{display}: missing frontmatter marker.");
+        bail!("{display}: missing frontmatter marker.");
     };
 
     let mut metadata = HashMap::new();
     loop {
-        if remaining.trim().starts_with("---\n") {
-            remaining = remaining.trim().strip_prefix("---\n").unwrap();
+        let trimmed_remaining = remaining.trim();
+        if trimmed_remaining == "---" || trimmed_remaining.starts_with("---\n") {
+            remaining = trimmed_remaining.strip_prefix("---").unwrap().trim_start_matches('\n');
             break;
         }
 
-        let line_end = remaining.find('\n').unwrap_or_else(|| {
-            panic!("{display}: missing closing frontmatter marker.");
-        });
+        let line_end = remaining
+            .find('\n')
+            .with_context(|| format!("{display}: missing closing frontmatter marker."))?;
         let line = &remaining[..line_end];
-        let colon = line.find(':').unwrap_or_else(|| {
-            panic!("{display}: invalid frontmatter line: \"{line}\".");
-        });
+        let colon = line
+            .find(':')
+            .with_context(|| format!("{display}: invalid frontmatter line: \"{line}\"."))?;
         let (key, value) = line.split_at(colon);
         metadata.insert(key.trim().to_string(), value[1..].trim().to_string());
         remaining = &remaining[line_end + 1..];
@@ -171,16 +242,16 @@ pub fn parse_frontmatter(content: &str, source_path: &Path) -> (HashMap<String, 
 
     for field in REQUIRED_FIELDS {
         if !metadata.contains_key(*field) {
-            panic!("{display}: missing required field \"{field}\".");
+            bail!("{display}: missing required field \"{field}\".");
         }
     }
     for key in metadata.keys() {
         if !REQUIRED_FIELDS.contains(&key.as_str()) && !OPTIONAL_FIELDS.contains(&key.as_str()) {
-            panic!("{display}: unknown field \"{key}\".");
+            bail!("{display}: unknown field \"{key}\".");
         }
     }
 
-    return (metadata, remaining.to_string());
+    return Ok((metadata, remaining.to_string()));
 }
 
 // ============================================================
@@ -196,7 +267,6 @@ pub fn extract_internal_links(body: &str) -> Vec<String> {
             .find([')', ' ', '\n', '"', '<'])
             .unwrap_or(after_prefix.len());
         let slug = &after_prefix[..slug_end];
-        // Strip any #fragment from the slug
         let slug = slug.split('#').next().unwrap_or(slug);
         if !slug.is_empty() && !links.contains(&slug.to_string()) {
             links.push(slug.to_string());

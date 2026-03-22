@@ -1,7 +1,10 @@
 use leptos::prelude::*;
 use leptos_router::components::A;
 
-use crate::{components::scramble::ScrambleText, models::post::POSTS};
+use crate::{
+    components::{render::call_render_post, scramble::ScrambleText},
+    models::post::{POSTS, Post},
+};
 
 // ============================================================
 // Text Segments
@@ -52,19 +55,16 @@ pub fn render_segments(segments: &'static [TextSegment]) -> impl IntoView {
 // ============================================================
 
 /// Renders a listing title as either a scrambled teaser or a clickable link,
-/// depending on whether the title contains scrambled segments.
-fn render_listing_title(title_segments: &'static [TextSegment], url: &'static str) -> impl IntoView {
+/// depending on whether the title contains scrambled segments or url is present.
+fn render_listing_title(title_segments: &'static [TextSegment], url: Option<&'static str>) -> impl IntoView {
     let is_scrambled = segments_has_scrambled(title_segments);
 
-    if is_scrambled {
-        return view! {
-            <span class="listing-title teaser">{render_segments(title_segments)}</span>
-        }
-        .into_any();
+    if is_scrambled || url.is_none() {
+        return view! { <span class="listing-title">{render_segments(title_segments)}</span> }.into_any();
     }
 
     return view! {
-        <a href=url target="_blank" class="listing-title">
+        <a href=url.unwrap() target="_blank" class="listing-title">
             {render_segments(title_segments)}
         </a>
     }
@@ -82,7 +82,7 @@ pub enum RelatedKind {
 }
 
 pub fn render_related_posts(title: &str, kind: RelatedKind) -> Option<impl IntoView + use<>> {
-    let matching_posts: Vec<_> = POSTS
+    let matching_posts: Vec<&'static Post> = POSTS
         .iter()
         .filter(|post| {
             let value = match kind {
@@ -91,7 +91,6 @@ pub fn render_related_posts(title: &str, kind: RelatedKind) -> Option<impl IntoV
             };
             value.is_some_and(|name| name.eq_ignore_ascii_case(title))
         })
-        .map(|post| (post.slug, post.title()))
         .collect();
 
     if matching_posts.is_empty() {
@@ -102,10 +101,24 @@ pub fn render_related_posts(title: &str, kind: RelatedKind) -> Option<impl IntoV
     let post_links = matching_posts
         .into_iter()
         .enumerate()
-        .map(|(index, (slug, title))| {
+        .map(|(index, post)| {
             let is_last = index + 1 >= total_count;
+            let slug = post.slug;
+            let title = post.title();
+            let desc = post.description();
+            let tags = post.tags().join(", ");
+            let series = post.series().unwrap_or("");
+
             view! {
-                <A href=format!("/blog/{}", slug)>{title}</A>
+                <A
+                    href=format!("/blog/{}", slug)
+                    attr:data-post-title=title
+                    attr:data-post-desc=desc
+                    attr:data-post-tags=tags
+                    attr:data-post-series=series
+                >
+                    {title}
+                </A>
                 {(!is_last).then(|| view! { <span class="related-sep">{"\u{00b7}"}</span> })}
             }
         })
@@ -137,24 +150,7 @@ pub fn PublicationListing(entries: &'static [PublicationEntry]) -> impl IntoView
         return view! { <p class="placeholder">"No publications yet."</p> }.into_any();
     }
 
-    Effect::new(move |_: Option<()>| {
-        let _ = js_sys::eval(
-            r#"
-            requestAnimationFrame(function() {
-                var el = document.getElementById("listing-content");
-                if (el && window.renderMathInElement) {
-                    renderMathInElement(el, {
-                        delimiters: [
-                            { left: "\\(", right: "\\)", display: false },
-                            { left: "\\[", right: "\\]", display: true }
-                        ],
-                        throwOnError: false
-                    });
-                }
-            });
-            "#,
-        );
-    });
+    call_render_post();
 
     return view! {
         <ul id="listing-content" class="listing">
@@ -167,7 +163,8 @@ pub fn PublicationListing(entries: &'static [PublicationEntry]) -> impl IntoView
                     let has_date = !segments_empty(entry.date);
                     let has_metadata = has_authors || has_date;
                     let related = render_related_posts(&plain_title, RelatedKind::Publication);
-                    let title_view = render_listing_title(entry.title, entry.url);
+                    let pub_url = if entry.url.is_empty() { None } else { Some(entry.url) };
+                    let title_view = render_listing_title(entry.title, pub_url);
 
                     view! {
                         <li id=entry_id>
@@ -181,8 +178,7 @@ pub fn PublicationListing(entries: &'static [PublicationEntry]) -> impl IntoView
                                             {render_segments(entry.date)}
                                         </p>
                                     }
-                                })}
-                            <p class="listing-desc">{render_segments(entry.description)}</p>
+                                })} <p class="listing-desc">{render_segments(entry.description)}</p>
                             {related}
                         </li>
                     }
@@ -237,8 +233,16 @@ impl ProjectStatus {
 pub struct ProjectEntry {
     pub title: &'static [TextSegment],
     pub description: &'static [TextSegment],
-    pub url: &'static str,
+    pub url: Option<&'static str>,
     pub status: ProjectStatus,
+    pub company: Option<&'static str>,
+    pub anonymous: bool,
+}
+
+impl ProjectEntry {
+    pub fn is_professional(&self) -> bool {
+        self.company.is_some() || self.anonymous
+    }
 }
 
 #[component]
@@ -247,51 +251,101 @@ pub fn ProjectListing(entries: &'static [ProjectEntry]) -> impl IntoView {
         return view! { <p class="placeholder">"No projects yet."</p> }.into_any();
     }
 
-    return view! {
-        <div class="listing">
-            {ProjectStatus::all()
-                .iter()
-                .filter_map(|&status| {
-                    let group: Vec<_> = entries
-                        .iter()
-                        .filter(|entry| entry.status == status)
-                        .collect();
+    call_render_post();
 
-                    if group.is_empty() {
-                        return None;
+    let professional: Vec<_> = entries.iter().filter(|e| e.is_professional()).collect();
+    let private: Vec<_> = entries.iter().filter(|e| !e.is_professional()).collect();
+
+    let professional_views: Vec<_> = professional
+        .clone()
+        .into_iter()
+        .map(|entry| {
+            let plain_title = segments_plain_value(entry.title);
+            let entry_id = plain_title.clone();
+            let title_view = render_listing_title(entry.title, entry.url);
+            let company_indicator = entry
+                .company
+                .map(|company| view! { <span class="project-company">{" · "}{company}</span> }.into_any())
+                .unwrap_or_else(|| {
+                    if entry.anonymous {
+                        view! { <span class="project-company">{" · "}"Professional"</span> }.into_any()
+                    } else {
+                        view! { <span /> }.into_any()
                     }
+                });
 
-                    Some(view! {
-                        <div class="listing-category" id=status.id()>
-                            <h2 class="listing-category-title">{status.label()}</h2>
-                            <ul>
-                                {group
-                                    .into_iter()
-                                    .map(|entry| {
-                                        let plain_title = segments_plain_value(entry.title);
-                                        let entry_id = plain_title.clone();
-                                        let related = render_related_posts(
-                                            &plain_title,
-                                            RelatedKind::Project,
-                                        );
-                                        let title_view = render_listing_title(entry.title, entry.url);
+            view! {
+                <div class="professional-project" id=entry_id>
+                    <div class="professional-project-header">{title_view} {company_indicator}</div>
+                    <p class="listing-desc">{render_segments(entry.description)}</p>
+                </div>
+            }
+        })
+        .collect();
 
-                                        view! {
-                                            <li id=entry_id>
-                                                {title_view}
-                                                <p class="listing-desc">
-                                                    {render_segments(entry.description)}
-                                                </p>
-                                                {related}
-                                            </li>
-                                        }
-                                    })
-                                    .collect_view()}
-                            </ul>
-                        </div>
-                    })
-                })
-                .collect_view()}
+    let private_status_views: Vec<_> = ProjectStatus::all()
+        .iter()
+        .filter_map(|&status| {
+            let group: Vec<_> = private.iter().filter(|entry| entry.status == status).copied().collect();
+            if group.is_empty() {
+                return None;
+            }
+            let id = format!("private-{}", status.id());
+            Some(view! {
+                <div class="listing-category" id=id>
+                    <h3 class="listing-category-title">{status.label()}</h3>
+                    <ul>
+                        {group
+                            .into_iter()
+                            .map(|entry| {
+                                let plain_title = segments_plain_value(entry.title);
+                                let entry_id = plain_title.clone();
+                                let related = render_related_posts(
+                                    &plain_title,
+                                    RelatedKind::Project,
+                                );
+                                let title_view = render_listing_title(entry.title, entry.url);
+
+                                view! {
+                                    <li id=entry_id>
+                                        {title_view}
+                                        <p class="listing-desc">
+                                            {render_segments(entry.description)}
+                                        </p> {related}
+                                    </li>
+                                }
+                            })
+                            .collect_view()}
+                    </ul>
+                </div>
+            })
+        })
+        .collect();
+
+    return view! {
+        <div id="listing-content" class="listing">
+            {if !private.is_empty() {
+                view! {
+                    <div class="project-category">
+                        <h1 class="project-category-title">"Private Projects"</h1>
+                        <div class="private-projects-list">{private_status_views}</div>
+                    </div>
+                }
+                    .into_any()
+            } else {
+                view! { <div /> }.into_any()
+            }}
+            {if !professional.is_empty() {
+                view! {
+                    <div class="project-category">
+                        <h1 class="project-category-title">"Professional Projects"</h1>
+                        <div class="professional-projects-list">{professional_views}</div>
+                    </div>
+                }
+                    .into_any()
+            } else {
+                view! { <div /> }.into_any()
+            }}
         </div>
     }
     .into_any();

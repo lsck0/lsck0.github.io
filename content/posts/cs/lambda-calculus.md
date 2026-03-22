@@ -7,7 +7,6 @@ tags: cs, math, plt
 publication: cs
 project: plt
 sources: https://plato.stanford.edu/entries/lambda-calculus/
-date: 2026-03-05
 ---
 
 The lambda calculus, introduced by Alonzo Church in the 1930s, is a formal system for expressing computation. Everything is a function.
