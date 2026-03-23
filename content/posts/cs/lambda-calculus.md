@@ -7,28 +7,33 @@ tags: cs, math, plt
 publication: cs
 project: plt
 sources: https://plato.stanford.edu/entries/lambda-calculus/
+toc: true
 ---
 
 The lambda calculus, introduced by Alonzo Church in the 1930s, is a formal system for expressing computation. Everything is a function.
 
 ## Syntax
 
+```definition Lambda Term {#def:lambda-term}
 There are only three kinds of terms:
 
 1. **Variable**: $x$
 2. **Abstraction**: $\lambda x.\, M$ (a function with parameter $x$ and body $M$)
 3. **Application**: $M\; N$ (applying function $M$ to argument $N$)
+```
 
 That's it. No numbers, no strings, no loops. Everything else is encoded.
 
 ## Church Numerals
 
+```definition Church Numeral {#def:church-numeral}
 Natural numbers encoded as repeated application:
 
 $$0 \equiv \lambda f.\, \lambda x.\, x$$
 $$1 \equiv \lambda f.\, \lambda x.\, f\; x$$
 $$2 \equiv \lambda f.\, \lambda x.\, f\; (f\; x)$$
 $$n \equiv \lambda f.\, \lambda x.\, f^n\; x$$
+```
 
 The successor function adds one more application of $f$:
 
@@ -42,11 +47,13 @@ $$\text{AND} \equiv \lambda p.\, \lambda q.\, p\; q\; p$$
 
 ## The Y Combinator
 
+```definition Y Combinator {#def:y-combinator}
 Recursion without names:
 
 $$Y \equiv \lambda f.\, (\lambda x.\, f\; (x\; x))\; (\lambda x.\, f\; (x\; x))$$
 
 This fixed-point combinator satisfies $Y\; g = g\; (Y\; g)$ for any $g$.
+```
 
 ## In Rust
 

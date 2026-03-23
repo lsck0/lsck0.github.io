@@ -10,7 +10,7 @@ use leptos_router::{
 use crate::{
     components::{
         layout::Layout,
-        storage::{is_bookmarked, is_read, set_bookmarked},
+        storage::{is_bookmarked, is_read, mark_read, mark_unread, set_bookmarked},
     },
     models::{meta::META, post::POSTS, search::fuzzy_score},
     pages::graph::GraphView,
@@ -164,10 +164,7 @@ pub fn BlogPage() -> impl IntoView {
                     let body_score = fuzzy_score(&query_text, post.body);
                     let block_text = post.labeled_block_text();
                     let block_score = fuzzy_score(&query_text, &block_text).map(|score| score.saturating_mul(2));
-                    let best = [title_score, body_score, block_score]
-                        .into_iter()
-                        .flatten()
-                        .max();
+                    let best = [title_score, body_score, block_score].into_iter().flatten().max();
                     best.map(|score| (index, score))
                 })
                 .collect();
@@ -457,7 +454,8 @@ fn render_tree_view(
                                         let items = folder_posts
                                             .into_iter()
                                             .map(|post| {
-                                                let read = is_read(post.slug);
+                                                let slug = post.slug.to_string();
+                                                let (read_sig, set_read_sig) = signal(is_read(post.slug));
                                                 let slug_display = post
                                                     .slug
                                                     .rsplit('/')
@@ -465,18 +463,11 @@ fn render_tree_view(
                                                     .unwrap_or(post.slug);
                                                 view! {
                                                     <div class="tree-file">
-                                                        <A
-                                                            href=format!("/blog/{}", post.slug)
-                                                            attr:class="tree-file-link"
-                                                        >
+                                                        <A href=post.href() attr:class="tree-file-link">
                                                             {slug_display}
                                                         </A>
                                                         <span class="tree-file-meta">{post.date_formatted()}</span>
-                                                        <span class=if read {
-                                                            "read-badge read"
-                                                        } else {
-                                                            "read-badge unread"
-                                                        }>{if read { "read" } else { "unread" }}</span>
+                                                        {render_read_badge(slug, read_sig, set_read_sig)}
                                                     </div>
                                                 }
                                             })
@@ -560,21 +551,15 @@ fn render_series_view(
                                             .into_iter()
                                             .enumerate()
                                             .map(|(i, post)| {
-                                                let read = is_read(post.slug);
+                                                let slug = post.slug.to_string();
+                                                let (read_sig, set_read_sig) = signal(is_read(post.slug));
                                                 view! {
                                                     <div class="series-entry">
                                                         <span class="series-num">{format!("{}.", i + 1)}</span>
-                                                        <A
-                                                            href=format!("/blog/{}", post.slug)
-                                                            attr:class="series-link"
-                                                        >
+                                                        <A href=post.href() attr:class="series-link">
                                                             {post.title()}
                                                         </A>
-                                                        <span class=if read {
-                                                            "read-badge read"
-                                                        } else {
-                                                            "read-badge unread"
-                                                        }>{if read { "read" } else { "unread" }}</span>
+                                                        {render_read_badge(slug, read_sig, set_read_sig)}
                                                     </div>
                                                 }
                                             })
@@ -587,35 +572,53 @@ fn render_series_view(
                     .collect_view();
                 let standalone_view = (!standalone.is_empty())
                     .then(|| {
+                        let total = standalone.len();
+                        let read_count = standalone
+                            .iter()
+                            .filter(|post| is_read(post.slug))
+                            .count();
+                        let is_collapsed = collapsed.contains("__standalone__");
+                        let icon = if is_collapsed { "\u{25b6}" } else { "\u{25bc}" };
                         let items = standalone
                             .into_iter()
                             .map(|post| {
-                                let read = is_read(post.slug);
-
+                                let slug = post.slug.to_string();
+                                let (read_sig, set_read_sig) = signal(is_read(post.slug));
                                 view! {
                                     <div class="series-entry">
-                                        <A
-                                            href=format!("/blog/{}", post.slug)
-                                            attr:class="series-link"
-                                        >
+                                        <A href=post.href() attr:class="series-link">
                                             {post.title()}
                                         </A>
                                         <span class="tree-file-meta">{post.date_formatted()}</span>
-                                        <span class=if read {
-                                            "read-badge read"
-                                        } else {
-                                            "read-badge unread"
-                                        }>{if read { "read" } else { "unread" }}</span>
+                                        {render_read_badge(slug, read_sig, set_read_sig)}
                                     </div>
                                 }
                             })
                             .collect_view();
                         view! {
                             <div class="series-section standalone-section">
-                                <div class="series-header-btn standalone">
-                                    <span class="series-name">"standalone"</span>
-                                </div>
-                                <div class="series-entries">{items}</div>
+                                <button
+                                    class="series-header-btn"
+                                    on:click=move |_| {
+                                        let key = "__standalone__".to_string();
+                                        set_collapsed_series
+                                            .update(|set| {
+                                                if !set.remove(&key) {
+                                                    set.insert(key);
+                                                }
+                                            });
+                                    }
+                                >
+                                    <span class="tree-icon">{icon}</span>
+                                    <span class="series-name">"Standalone"</span>
+                                    <span class="series-progress">
+                                        {format!("{read_count}/{total}")}
+                                    </span>
+                                </button>
+                                {(!is_collapsed)
+                                    .then(|| {
+                                        view! { <div class="series-entries">{items}</div> }
+                                    })}
                             </div>
                         }
                     });
@@ -655,10 +658,11 @@ fn render_graph_view(
 
 fn render_post_card(post: &crate::models::post::Post) -> impl IntoView {
     let slug = post.slug.to_string();
-    let href = format!("/blog/{}", post.slug);
+    let slug_for_read = slug.clone();
+    let href = post.href();
     let title = post.title().to_string();
     let date = post.date_formatted();
-    let read = is_read(post.slug);
+    let (read_sig, set_read_sig) = signal(is_read(post.slug));
     let (bookmarked, set_bookmarked_sig) = signal(is_bookmarked(post.slug));
 
     let series_hint = post.series().map(|name| {
@@ -705,11 +709,7 @@ fn render_post_card(post: &crate::models::post::Post) -> impl IntoView {
                     {title}
                 </A>
                 {series_hint.map(|hint| view! { <span class="post-series">{hint}</span> })}
-                <span class=if read {
-                    "read-badge read"
-                } else {
-                    "read-badge unread"
-                }>{if read { "read" } else { "unread" }}</span>
+                {render_read_badge(slug_for_read, read_sig, set_read_sig)}
             </div>
             <div class="post-card-meta">
                 <span class="post-date">{date}</span>
@@ -721,4 +721,32 @@ fn render_post_card(post: &crate::models::post::Post) -> impl IntoView {
                 })}
         </li>
     };
+}
+
+// ============================================================
+// Read badge (shared clickable component)
+// ============================================================
+
+fn render_read_badge(slug: String, read_sig: ReadSignal<bool>, set_read_sig: WriteSignal<bool>) -> impl IntoView {
+    let toggle_read = move |_: leptos::ev::MouseEvent| {
+        let current = read_sig.get();
+        if current {
+            mark_unread(&slug);
+        } else {
+            mark_read(&slug);
+        }
+        set_read_sig.set(!current);
+    };
+
+    view! {
+        <button
+            class=move || if read_sig.get() { "read-badge read" } else { "read-badge unread" }
+            on:click=toggle_read
+            title=move || {
+                if read_sig.get() { "click to mark as unread" } else { "click to mark as read" }
+            }
+        >
+            {move || if read_sig.get() { "read" } else { "unread" }}
+        </button>
+    }
 }

@@ -1,7 +1,7 @@
 // ---- Listing pages (projects, publications) ----
 
 .listing-page {
-  max-width: 720px;
+  width: 100%;
 
   h1 {
     font-size: 1.5rem;
@@ -33,15 +33,15 @@
       }
     }
 
-.listing-category-title {
-  font-size: 1.1rem;
-  text-transform: lowercase;
-  color: var(--text);
-  font-weight: bold;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.35rem;
-}
+    .listing-category-title {
+      font-size: 1.1rem;
+      text-transform: lowercase;
+      color: var(--text);
+      font-weight: bold;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.35rem;
+    }
 
     .listing-title {
       font-weight: bold;
@@ -96,7 +96,8 @@
     font-style: italic;
   }
 
-  .professional-projects-list {
+  .professional-projects-list,
+  .private-projects-list {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -118,7 +119,4 @@
     margin-bottom: 0.5rem;
   }
 
-  .private-projects-list {
-    /* Status grouping styles already applied */
-  }
 }

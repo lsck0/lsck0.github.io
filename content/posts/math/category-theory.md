@@ -2,6 +2,8 @@
 title: Category Theory Fundamentals
 description: Categories, functors, natural transformations, and the language of modern mathematics.
 tags: math, category-theory
+publication: math
+toc: true
 ---
 
 **Category theory** provides a high-level language for mathematics, formalizing abstraction itself.

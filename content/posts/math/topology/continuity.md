@@ -3,21 +3,26 @@ title: What Continuity Really Means
 description: From epsilon-delta to open sets.
 tags: math, topology, analysis
 publication: math
+toc: true
 ---
 
 The epsilon-delta definition of continuity is familiar but hides the geometric intuition. Topology reveals what's really going on.
 
 ## The Epsilon-Delta Definition
 
+```definition Continuity (Epsilon-Delta) {#def:continuity-epsilon-delta}
 A function $f: \mathbb{R} \to \mathbb{R}$ is **continuous at** $a$ if:
 
 $$\forall \varepsilon > 0,\; \exists \delta > 0 : |x - a| < \delta \implies |f(x) - f(a)| < \varepsilon$$
+```
 
 ## The Topological Definition
 
+```definition Continuity (Topological) {#def:continuity-topological}
 A function $f: X \to Y$ between topological spaces is **continuous** if the preimage of every open set is open:
 
 $$V \subseteq Y \text{ open} \implies f^{-1}(V) \subseteq X \text{ open}$$
+```
 
 This is the same idea, stated without distances. The epsilon-balls *are* the open sets in $\mathbb{R}$[^1].
 

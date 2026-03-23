@@ -124,11 +124,6 @@
   gap: 0.75rem;
   align-items: center;
 
-  .last-edited {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-
   .post-tags {
     display: flex;
     gap: 0.4rem;
@@ -149,6 +144,7 @@
   h1 { font-size: 1.4rem; }
   h2 { font-size: 1.25rem; }
   h3 { font-size: 1.1rem; }
+
 
   .heading-num {
     color: var(--text-muted);
@@ -251,7 +247,7 @@
     }
   }
 
-  @media (min-width: 1200px) {
+  @media (min-width: 1201px) {
     .footnote-definition {
       float: right;
       clear: right;
@@ -351,13 +347,14 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
   margin: 1rem 0;
 }
 
-.copy-btn,
-.math-copy-btn {
+.copy-btn {
   position: absolute;
   top: 0;
   right: 0;
-  background: none;
+  background: var(--code-bg);
   border: none;
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   color: var(--text-muted);
   font-family: inherit;
   cursor: pointer;
@@ -370,18 +367,13 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
     color: var(--text);
     opacity: 1 !important;
   }
-}
 
-.copy-btn {
-  background: var(--code-bg);
-  border-left: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-
-  pre:hover & { opacity: 0.6; }
-}
-
-.math-copy-btn {
-  .math-display:hover & { opacity: 0.6; }
+  pre:hover &,
+  .math-display:hover &,
+  .tikz-diagram:hover &,
+  .mermaid:hover & {
+    opacity: 0.6;
+  }
 }
 
 // ---- Diff highlighting ----
@@ -417,7 +409,7 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
 }
 
 .callout-tip     { border-left-color: var(--callout-tip);    .callout-title { color: var(--callout-tip); } }
-.callout-warning { border-left-color: var(--callout-danger); .callout-title { color: var(--callout-danger); } }
+.callout-warning { border-left-color: var(--callout-warning); .callout-title { color: var(--callout-warning); } }
 .callout-danger  { border-left-color: var(--callout-danger); .callout-title { color: var(--callout-danger); } }
 .callout-note    { border-left-color: var(--accent);         .callout-title { color: var(--accent); } }
 .callout-info    { border-left-color: var(--callout-info);   .callout-title { color: var(--callout-info); } }
@@ -441,7 +433,12 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
   }
 
   ul { list-style: none; padding: 0; }
-  li { margin: 0.25rem 0; font-size: 0.9rem; }
+  li {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+    overflow-wrap: break-word;
+    word-break: break-all;
+  }
 
   .ref-backlinks {
     margin-left: 0.3rem;
@@ -460,7 +457,7 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
 
 .series-nav {
   border: 1px solid var(--border);
-  padding: 0.6rem 1rem;
+  padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
   font-size: 0.85rem;
 
@@ -470,10 +467,26 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
   }
 
   .series-toc {
+    list-style: none;
     margin: 0.5rem 0;
-    padding-left: 1.5rem;
+    padding-left: 0;
     font-size: 0.85rem;
-    li { margin: 0.2rem 0; }
+
+    li {
+      margin: 0.25rem 0;
+
+      a {
+        color: var(--text);
+        text-decoration: none;
+        &:hover { color: var(--accent); }
+      }
+
+      .toc-num {
+        color: var(--text-muted);
+        margin-right: 0.4rem;
+        font-size: 0.8em;
+      }
+    }
   }
 
   .series-prev-next {
@@ -573,6 +586,18 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
   width: 90%;
   max-width: 500px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+// ---- Search highlights ----
+
+mark.post-search-highlight {
+  background: var(--accent);
+  color: var(--bg);
+  padding: 0 0.1em;
+
+  &.current {
+    background: var(--callout-warning);
+  }
 }
 
 // ---- In-page search (Ctrl+F) ----

@@ -1,11 +1,19 @@
 // ---- Sidebar ----
 
 .sidebar {
+  display: none;
   width: 240px;
   flex-shrink: 0;
   position: sticky;
   top: 2rem;
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
   font-size: 0.8rem;
+
+  // Desktop: shown when hamburger toggles it
+  &.desktop-open {
+    display: block;
+  }
 
   .sidebar-item {
     display: block;

@@ -23,6 +23,7 @@ pub mod storage;
 pub struct SidebarState {
     pub collapsed_folders: RwSignal<BTreeSet<String>>,
     pub is_mobile_open: RwSignal<bool>,
+    pub is_desktop_open: RwSignal<bool>,
     pub is_blog_open: RwSignal<bool>,
     pub is_projects_open: RwSignal<bool>,
     pub collapsed_project_groups: RwSignal<BTreeSet<String>>,
@@ -59,6 +60,7 @@ impl SidebarState {
         return Self {
             collapsed_folders: RwSignal::new(initially_collapsed_folders),
             is_mobile_open: RwSignal::new(false),
+            is_desktop_open: RwSignal::new(true),
             is_blog_open: RwSignal::new(true),
             is_projects_open: RwSignal::new(false),
             collapsed_project_groups: RwSignal::new(initially_collapsed_project_groups),
@@ -105,9 +107,34 @@ pub fn toggle_theme() {
     let local_storage = window.local_storage().unwrap().unwrap();
     local_storage.set_item("theme", new_theme).unwrap();
 
-    let giscus_theme = if new_theme == "light" { "light" } else { "dark_dimmed" };
+    let giscus_theme = giscus_theme_for(new_theme);
     let rerender_script = RERENDER_MERMAID_AND_GISCUS_JS
         .replace("THEME_PLACEHOLDER", new_theme)
         .replace("GISCUS_THEME_PLACEHOLDER", giscus_theme);
     let _ = js_sys::eval(&rerender_script);
+}
+
+// ============================================================
+// Shared utilities
+// ============================================================
+
+/// Map site theme name to Giscus theme name.
+pub fn giscus_theme_for(theme: &str) -> &'static str {
+    if theme == "light" { "light" } else { "dark_dimmed" }
+}
+
+/// Capitalize the first character of a string.
+pub fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+    }
+}
+
+/// Toggle membership of an item in a BTreeSet (insert if absent, remove if present).
+pub fn toggle_in_set(set: &mut BTreeSet<String>, item: &str) {
+    if !set.remove(item) {
+        set.insert(item.to_string());
+    }
 }

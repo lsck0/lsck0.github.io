@@ -47,3 +47,9 @@ pub fn mark_read(slug: &str) {
         let _ = storage.set_item(&format!("read:{slug}"), &js_sys::Date::now().to_string());
     }
 }
+
+pub fn mark_unread(slug: &str) {
+    if let Some(storage) = get_storage() {
+        let _ = storage.remove_item(&format!("read:{slug}"));
+    }
+}

@@ -93,8 +93,8 @@ pub fn include_posts_impl(_input: TokenStream) -> TokenStream {
 
     // Resolve cross-references in block preview content first
     let mut resolved_registry = registry.clone();
-    for (label, (_slug, _kind, _title, _number, content)) in resolved_registry.iter_mut() {
-        *content = resolve_cross_references_preview(content, label, &registry);
+    for (_label, (_slug, _kind, _title, _number, content)) in resolved_registry.iter_mut() {
+        *content = resolve_cross_references_preview(content, &registry);
     }
 
     // Resolve explicit [[label]] cross-references in post bodies
@@ -383,10 +383,72 @@ fn resolve_cross_references(
     current_slug: &str,
     registry: &HashMap<String, (String, String, String, String, String)>,
 ) -> String {
+    // Process line by line to skip fenced code blocks
     let mut result = String::new();
-    let mut remaining = body;
+    let mut in_code_block = false;
+    let mut code_fence_len: usize = 0;
+
+    for line in body.lines() {
+        let trimmed = line.trim();
+        let backtick_count = trimmed.chars().take_while(|&c| c == '`').count();
+
+        if in_code_block {
+            if backtick_count >= code_fence_len && trimmed[backtick_count..].trim().is_empty() {
+                in_code_block = false;
+            }
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        if backtick_count >= 3 && !trimmed[backtick_count..].trim().is_empty() {
+            in_code_block = true;
+            code_fence_len = backtick_count;
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        // Also skip closing fences (```\n without info string)
+        if backtick_count >= 3 && trimmed[backtick_count..].trim().is_empty() && trimmed.len() == backtick_count {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        // Process cross-references only in non-code lines
+        let resolved = resolve_cross_references_line(line, current_slug, registry);
+        result.push_str(&resolved);
+        result.push('\n');
+    }
+
+    // Remove trailing newline if original didn't have one
+    if !body.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
+
+    return result;
+}
+
+fn resolve_cross_references_line(
+    line: &str,
+    current_slug: &str,
+    registry: &HashMap<String, (String, String, String, String, String)>,
+) -> String {
+    let mut result = String::new();
+    let mut remaining = line;
 
     while let Some(start) = remaining.find("[[") {
+        // Skip if inside inline code
+        let before = &remaining[..start];
+        let backtick_count = before.chars().filter(|&c| c == '`').count();
+        if backtick_count % 2 == 1 {
+            // Inside inline code — don't process
+            result.push_str(&remaining[..start + 2]);
+            remaining = &remaining[start + 2..];
+            continue;
+        }
+
         // Skip transclusion markers ![[
         if start > 0 && remaining.as_bytes()[start - 1] == b'!' {
             result.push_str(&remaining[..start + 2]);
@@ -394,7 +456,7 @@ fn resolve_cross_references(
             continue;
         }
 
-        result.push_str(&remaining[..start]);
+        result.push_str(before);
         let after = &remaining[start + 2..];
 
         if let Some(end) = after.find("]]") {
@@ -414,40 +476,26 @@ fn resolve_cross_references(
             };
 
             if let Some((slug, kind, title, number, content)) = registry.get(label) {
-                let html_id = label.replace(':', "-");
                 let effective_slug = target_slug_override.unwrap_or(slug.as_str());
-                let is_same_page = effective_slug == current_slug;
-                let href = if is_same_page {
-                    format!("#{html_id}")
-                } else {
-                    format!("/blog/{effective_slug}#{html_id}")
-                };
-
                 let display_text = if let Some(custom) = custom_display {
                     custom.to_string()
                 } else {
                     default_xref_display(kind, title, number)
                 };
-
-                let escaped_preview = escape_for_attribute(content);
-                let target_attr = if is_same_page {
-                    ""
-                } else {
-                    " target=\"_blank\" rel=\"noopener\""
-                };
-
-                let escaped_title = escape_for_attribute(title);
-                result.push_str(&format!(
-                    "<a class=\"xref\" href=\"{href}\" \
-                     data-preview=\"{escaped_preview}\" \
-                     data-block-label=\"{label}\" data-block-kind=\"{kind}\" \
-                     data-block-title=\"{escaped_title}\" \
-                     data-block-number=\"{number}\"{target_attr}>{display_text}</a>"
+                result.push_str(&block_anchor(
+                    "xref",
+                    label,
+                    kind,
+                    title,
+                    number,
+                    content,
+                    effective_slug,
+                    current_slug,
+                    &display_text,
                 ));
             } else {
-                result.push_str(&format!(
-                    "<span class=\"xref-broken\" title=\"Unknown reference: {label}\">[[{ref_content}]]</span>"
-                ));
+                // Unknown reference — leave the original text, don't create broken span
+                result.push_str(&format!("[[{ref_content}]]"));
             }
 
             remaining = &after[end + 2..];
@@ -463,7 +511,6 @@ fn resolve_cross_references(
 
 fn resolve_cross_references_preview(
     content: &str,
-    _self_label: &str,
     registry: &HashMap<String, (String, String, String, String, String)>,
 ) -> String {
     let mut result = String::new();
@@ -586,7 +633,7 @@ fn build_term_index(
 
 /// Auto-link defined terms in a post's body text.
 /// Every occurrence of each term per post is linked.
-/// Skips: HTML tags, comments, inline code, math, and existing xref/auto-def spans.
+/// Skips: HTML tags, comments, inline code, math, fenced code blocks, and existing xref/auto-def spans.
 fn auto_link_definitions(
     body: &str,
     current_slug: &str,
@@ -597,11 +644,28 @@ fn auto_link_definitions(
         return body.to_string();
     }
 
+    // Build a set of byte ranges that are inside fenced code blocks
+    let code_block_ranges = find_fenced_code_ranges(body);
+
     let body_lower = body.to_lowercase();
     let mut result = String::new();
     let mut pos = 0;
 
     while pos < body.len() {
+        // Skip fenced code block regions entirely
+        if let Some(range) = code_block_ranges.iter().find(|(start, _)| *start == pos) {
+            result.push_str(&body[range.0..range.1]);
+            pos = range.1;
+            continue;
+        }
+        // If we're inside a code block range, skip character by character until we exit
+        if code_block_ranges.iter().any(|(start, end)| pos > *start && pos < *end) {
+            let ch = body[pos..].chars().next().unwrap();
+            result.push(ch);
+            pos += ch.len_utf8();
+            continue;
+        }
+
         // Try to skip opaque regions (HTML tags, comments, code, math)
         if let Some(skip) = skip_opaque_region(body, pos) {
             result.push_str(&body[pos..pos + skip]);
@@ -632,31 +696,21 @@ fn auto_link_definitions(
 
             if let Some((end, term)) = best_match {
                 let original = &body[pos..end];
-                let html_id = term.label.replace(':', "-");
-                let is_same_page = term.slug == current_slug;
-                let href = if is_same_page {
-                    format!("#{html_id}")
-                } else {
-                    format!("/blog/{}#{html_id}", term.slug)
-                };
-                let target_attr = if is_same_page {
-                    ""
-                } else {
-                    " target=\"_blank\" rel=\"noopener\""
-                };
                 let kind_class = match term.kind.as_str() {
                     "definition" => "auto-def",
                     "theorem" | "lemma" | "corollary" | "proposition" => "auto-thm",
                     _ => "auto-def",
                 };
-                let escaped_title = escape_for_attribute(&term.title);
-                result.push_str(&format!(
-                    "<a class=\"{kind_class}\" href=\"{href}\" \
-                     data-preview=\"{}\" \
-                     data-block-label=\"{}\" data-block-kind=\"{}\" \
-                     data-block-title=\"{escaped_title}\" \
-                     data-block-number=\"{}\"{target_attr}>{original}</a>",
-                    term.preview, term.label, term.kind, term.number
+                result.push_str(&block_anchor(
+                    kind_class,
+                    &term.label,
+                    &term.kind,
+                    &term.title,
+                    &term.number,
+                    &term.preview,
+                    &term.slug,
+                    current_slug,
+                    original,
                 ));
                 pos = end;
             } else {
@@ -674,6 +728,44 @@ fn auto_link_definitions(
     }
 
     return result;
+}
+
+/// Find byte ranges of fenced code blocks (``` ... ```) in the body.
+/// Returns a vec of (start_byte, end_byte) pairs.
+fn find_fenced_code_ranges(body: &str) -> Vec<(usize, usize)> {
+    let mut ranges = Vec::new();
+    let mut in_code = false;
+    let mut fence_len = 0usize;
+    let mut block_start = 0usize;
+    let mut line_start = 0usize;
+
+    for line in body.lines() {
+        let trimmed = line.trim();
+        let backticks = trimmed.chars().take_while(|&c| c == '`').count();
+
+        if in_code {
+            if backticks >= fence_len && trimmed[backticks..].trim().is_empty() {
+                // End of code block — include the closing fence
+                let line_end = line_start + line.len();
+                ranges.push((block_start, line_end));
+                in_code = false;
+            }
+        } else if backticks >= 3 && !trimmed[backticks..].trim().is_empty() {
+            // Opening fence with info string
+            in_code = true;
+            fence_len = backticks;
+            block_start = line_start;
+        }
+
+        line_start += line.len() + 1; // +1 for the newline
+    }
+
+    // Handle unclosed code block
+    if in_code {
+        ranges.push((block_start, body.len()));
+    }
+
+    return ranges;
 }
 
 /// Returns the length of an opaque region starting at `pos`, or None if not in one.
@@ -697,13 +789,9 @@ fn skip_opaque_region(body: &str, pos: usize) -> Option<usize> {
         return remaining.find('>').map(|end| end + 1);
     }
 
-    // Fenced code blocks (```)
-    if let Some(after) = remaining.strip_prefix("```") {
-        return after.find("```").map(|end| end + 6);
-    }
-
-    // Inline code
-    if let Some(after) = remaining.strip_prefix('`') {
+    // Inline code (single backtick, not triple — fenced blocks handled separately)
+    if remaining.starts_with('`') && !remaining.starts_with("```") {
+        let after = &remaining[1..];
         return after.find('`').map(|end| end + 2);
     }
 
@@ -752,12 +840,48 @@ fn is_word_end(body: &str, pos: usize) -> bool {
 // Shared helpers
 // ============================================================
 
+/// Build an HTML anchor tag referencing a labeled block.
+#[allow(clippy::too_many_arguments)]
+fn block_anchor(
+    class: &str,
+    label: &str,
+    kind: &str,
+    title: &str,
+    number: &str,
+    preview: &str,
+    slug: &str,
+    current_slug: &str,
+    display_text: &str,
+) -> String {
+    let html_id = label.replace(':', "-");
+    let is_same_page = slug == current_slug;
+    let href = if is_same_page {
+        format!("#{html_id}")
+    } else {
+        format!("/blog/{slug}#{html_id}")
+    };
+    let target_attr = if is_same_page {
+        ""
+    } else {
+        " target=\"_blank\" rel=\"noopener\""
+    };
+    let escaped_preview = escape_for_attribute(preview);
+    let escaped_title = escape_for_attribute(title);
+    let escaped_label = escape_for_attribute(label);
+    return format!(
+        "<a class=\"{class}\" href=\"{href}\" data-preview=\"{escaped_preview}\" data-block-label=\"{escaped_label}\" \
+         data-block-kind=\"{kind}\" data-block-title=\"{escaped_title}\" \
+         data-block-number=\"{number}\"{target_attr}>{display_text}</a>"
+    );
+}
+
 fn escape_for_attribute(content: &str) -> String {
     return content
         .replace('&', "&amp;")
         .replace('"', "&quot;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+        .replace('\'', "&#39;")
         .replace('\n', " ");
 }
 

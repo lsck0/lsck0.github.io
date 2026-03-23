@@ -2,6 +2,8 @@
 title: A Visual Guide to Sorting Algorithms
 description: Comparing common sorting algorithms with complexity analysis and flow diagrams.
 tags: cs, algorithms
+publication: cs
+toc: true
 ---
 
 Sorting is one of the most fundamental operations in computer science. Let's compare a few classic algorithms.

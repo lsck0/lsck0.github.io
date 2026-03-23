@@ -9,14 +9,9 @@
     padding: 1rem 0.75rem;
   }
 
-  // Header: show nav links, add hamburger for sidebar
   .site-header {
     gap: 0.5rem;
     margin-bottom: 1.5rem;
-
-    .sidebar-toggle {
-      display: block;
-    }
 
     .site-nav {
       gap: 0.6rem;
@@ -27,7 +22,7 @@
 
   // Home
   .home {
-    .home-logo {
+    .home-lambda {
       font-size: 3rem;
     }
   }
@@ -42,7 +37,6 @@
   }
 
   .sidebar {
-    display: none;
     width: 100%;
     position: static;
     border-bottom: 1px solid var(--border);
@@ -64,12 +58,6 @@
     padding: 0.25rem 0.6rem;
   }
 
-  // Blog page
-  .blog-header {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
   .post-card-meta {
     margin-left: 0;
     margin-top: 0.3rem;
@@ -83,18 +71,16 @@
     flex-wrap: wrap;
   }
 
-  .tree-file-tags {
-    width: 100%;
-    padding-left: 1.4rem;
-  }
-
   // Post title
   .post-title {
     font-size: 1.3rem;
+    flex-wrap: wrap;
   }
 
   // Content: prevent overflow
   .content {
+    overflow-wrap: break-word;
+
     pre {
       padding: 0.75rem;
       font-size: 0.8rem;
@@ -105,11 +91,19 @@
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
     }
+
+    // Don't float footnotes as sidenotes on mobile
+    .footnote-definition {
+      float: none !important;
+      width: auto !important;
+      margin-right: 0 !important;
+    }
   }
 
   // Math overflow
   .math-display {
     font-size: 0.9em;
+    overflow-x: auto;
   }
 
   // Mermaid overflow
@@ -131,14 +125,32 @@
     text-align: center;
   }
 
-  // Labeled blocks
-  .labeled-block {
-    padding: 0.5rem 0;
-    border-left: none;
-  }
 
-  // Xref tooltips
+  // Xref tooltips: full width on mobile
   .xref-tooltip {
     max-width: calc(100vw - 32px);
+    left: 16px !important;
+    right: 16px;
+  }
+
+  // Post references: ensure wrapping
+  .post-references li {
+    word-break: break-all;
+  }
+
+  // Blog toolbar: stack views below search on small screens
+  .blog-views {
+    flex-wrap: wrap;
+  }
+
+  // Series navigation
+  .series-prev-next {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  // Global search: wider on mobile
+  .global-search {
+    width: 95%;
   }
 }

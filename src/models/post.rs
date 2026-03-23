@@ -2,7 +2,9 @@ use macros::include_posts;
 
 pub static POSTS: &[Post] = include_posts!();
 
-// ---- Date formatting ----
+// ============================================================
+// Date formatting
+// ============================================================
 
 fn format_date(date: &str) -> String {
     let parts: Vec<&str> = date.split('-').collect();
@@ -15,7 +17,9 @@ fn format_date(date: &str) -> String {
     return format!("{day}.{month}.{year}");
 }
 
-// ---- Labeled blocks (definition, theorem, lemma, etc.) ----
+// ============================================================
+// Labeled blocks
+// ============================================================
 
 pub struct LabeledBlock {
     pub label: &'static str,
@@ -25,7 +29,9 @@ pub struct LabeledBlock {
     pub content: &'static str,
 }
 
-// ---- Post ----
+// ============================================================
+// Post
+// ============================================================
 
 pub struct Post {
     pub slug: &'static str,
@@ -94,6 +100,10 @@ impl Post {
         return self.metadata_field("toc").is_some_and(|value| value == "true");
     }
 
+    pub fn href(&self) -> String {
+        return format!("/blog/{}", self.slug);
+    }
+
     pub fn date_formatted(&self) -> String {
         return format_date(self.date());
     }
@@ -112,7 +122,9 @@ impl Post {
             .join(" ");
     }
 
-    // ---- Relations ----
+    // ============================================================
+    // Relations
+    // ============================================================
 
     pub fn series_posts(&self) -> Vec<&'static Post> {
         let Some(series_name) = self.series() else {

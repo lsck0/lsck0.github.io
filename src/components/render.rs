@@ -266,7 +266,14 @@ fn process_events<'a>(parser: impl Iterator<Item = Event<'a>>) -> (Vec<Event<'a>
                         if is_trackable {
                             link_counter += 1;
                             let anchor_id = format!("ref-{link_counter}");
-                            link_occurrences.entry(url.clone()).or_default().push(anchor_id.clone());
+
+                            // Track by base URL (strip fragment) so all links to the same
+                            // page are grouped together in the references section.
+                            let tracking_url = url.split('#').next().unwrap_or(&url).to_string();
+                            link_occurrences
+                                .entry(tracking_url)
+                                .or_default()
+                                .push(anchor_id.clone());
 
                             let metadata_attributes = if let Some(slug) = url.strip_prefix("/blog/") {
                                 let slug = slug.split('#').next().unwrap_or(slug);
@@ -287,11 +294,6 @@ fn process_events<'a>(parser: impl Iterator<Item = Event<'a>>) -> (Vec<Event<'a>
                             } else {
                                 String::new()
                             };
-                            let url_without_fragment = url.split('#').next().unwrap_or(&url);
-                            link_occurrences
-                                .entry(url_without_fragment.to_string())
-                                .or_default()
-                                .push(anchor_id.clone());
                             events.push(Event::Html(
                                 format!(
                                     "<a href=\"{url}\" id=\"{anchor_id}\"{metadata_attributes} target=\"_blank\" \
@@ -428,7 +430,7 @@ fn process_labeled_blocks(html: &str) -> String {
                     let number = parts[2];
                     let title = parts[3].replace("\\|", "|");
 
-                    let kind_display = capitalize_first(kind);
+                    let kind_display = super::capitalize(kind);
                     let is_proof = kind == "proof";
 
                     let header_html = if is_proof {
@@ -499,14 +501,6 @@ fn slugify(text: &str) -> String {
         .filter(|segment| !segment.is_empty())
         .collect::<Vec<_>>()
         .join("-")
-}
-
-fn capitalize_first(text: &str) -> String {
-    let mut characters = text.chars();
-    match characters.next() {
-        None => String::new(),
-        Some(first) => first.to_uppercase().collect::<String>() + characters.as_str(),
-    }
 }
 
 fn html_escape(input: &str) -> String {

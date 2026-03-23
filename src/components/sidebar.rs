@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_location};
 
-use super::SidebarState;
+use super::{SidebarState, toggle_in_set};
 use crate::{
     components::listing::{ProjectStatus, render_segments, segments_has_scrambled, segments_plain_value},
     models::post::{POSTS, Post},
@@ -53,12 +53,16 @@ pub fn Sidebar() -> impl IntoView {
     let tree = build_post_tree();
     let items = flatten_tree(&tree, 1, "");
 
-    let close_mobile = move || {
+    let close_sidebar = move || {
         state.is_mobile_open.set(false);
     };
 
     return view! {
-        <nav class="sidebar" class:open=move || state.is_mobile_open.get()>
+        <nav
+            class="sidebar"
+            class:open=move || state.is_mobile_open.get()
+            class:desktop-open=move || state.is_desktop_open.get()
+        >
 
             // ============================================================
             // About
@@ -70,7 +74,7 @@ pub fn Sidebar() -> impl IntoView {
                     let path = location.pathname.get();
                     if path == "/about" { "sidebar-item active" } else { "sidebar-item" }
                 }
-                on:click=move |_| close_mobile()
+                on:click=move |_| close_sidebar()
             >
                 "about"
             </A>
@@ -130,11 +134,7 @@ pub fn Sidebar() -> impl IntoView {
                                     on:click=move |_| {
                                         state
                                             .collapsed_folders
-                                            .update(|set| {
-                                                if !set.remove(&path_for_click) {
-                                                    set.insert(path_for_click.clone());
-                                                }
-                                            });
+                                            .update(|set| toggle_in_set(set, &path_for_click));
                                     }
                                 >
                                     <span class="folder-icon">
@@ -179,10 +179,7 @@ pub fn Sidebar() -> impl IntoView {
                                         }
                                     }
                                 >
-                                    <A
-                                        href=format!("/blog/{}", post.slug)
-                                        on:click=move |_| close_mobile()
-                                    >
+                                    <A href=post.href() on:click=move |_| close_sidebar()>
                                         {post.title()}
                                     </A>
                                 </li>
@@ -218,7 +215,7 @@ pub fn Sidebar() -> impl IntoView {
                     href="/projects"
                     on:click=move |event| {
                         event.stop_propagation();
-                        close_mobile();
+                        close_sidebar();
                     }
                 >
                     "projects"
@@ -284,7 +281,7 @@ pub fn Sidebar() -> impl IntoView {
                                                 }
                                             }
                                         >
-                                            <A href=href on:click=move |_| close_mobile()>
+                                            <A href=href on:click=move |_| close_sidebar()>
                                                 {label}
                                             </A>
                                         </li>
@@ -298,11 +295,7 @@ pub fn Sidebar() -> impl IntoView {
                                     on:click=move |_| {
                                         state
                                             .collapsed_project_groups
-                                            .update(|set| {
-                                                if !set.remove(&status_id_for_click) {
-                                                    set.insert(status_id_for_click.clone());
-                                                }
-                                            });
+                                            .update(|set| toggle_in_set(set, &status_id_for_click));
                                     }
                                 >
                                     <span class="folder-icon">
@@ -340,7 +333,7 @@ pub fn Sidebar() -> impl IntoView {
                             };
                             view! {
                                 <li class="tree-post" style="padding-left: 1.5rem">
-                                    <A href=href on:click=move |_| close_mobile()>
+                                    <A href=href on:click=move |_| close_sidebar()>
                                         {label}
                                     </A>
                                 </li>
@@ -360,11 +353,7 @@ pub fn Sidebar() -> impl IntoView {
                                             on:click=move |_| {
                                                 state
                                                     .collapsed_project_groups
-                                                    .update(|set| {
-                                                        if !set.remove("private") {
-                                                            set.insert("private".to_string());
-                                                        }
-                                                    });
+                                                    .update(|set| toggle_in_set(set, "private"));
                                             }
                                         >
                                             <span class="folder-icon">
@@ -398,11 +387,7 @@ pub fn Sidebar() -> impl IntoView {
                                             on:click=move |_| {
                                                 state
                                                     .collapsed_project_groups
-                                                    .update(|set| {
-                                                        if !set.remove("professional") {
-                                                            set.insert("professional".to_string());
-                                                        }
-                                                    });
+                                                    .update(|set| toggle_in_set(set, "professional"));
                                             }
                                         >
                                             <span class="folder-icon">
@@ -463,7 +448,7 @@ pub fn Sidebar() -> impl IntoView {
                     href="/publications"
                     on:click=move |event| {
                         event.stop_propagation();
-                        close_mobile();
+                        close_sidebar();
                     }
                 >
                     "publications"
@@ -489,7 +474,7 @@ pub fn Sidebar() -> impl IntoView {
                         };
                         view! {
                             <li class="tree-post" style="padding-left: 0.75rem">
-                                <A href=href on:click=move |_| close_mobile()>
+                                <A href=href on:click=move |_| close_sidebar()>
                                     {label}
                                 </A>
                             </li>

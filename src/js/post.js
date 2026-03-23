@@ -79,7 +79,7 @@ function renderPost() {
           addCopyBtn(el.querySelectorAll(".mermaid[data-source]"), "copy mermaid", "Copy Mermaid source");
           setupMermaidZoom(el);
           addSearchText(el.querySelectorAll(".mermaid[data-source]"));
-        });
+        }).catch(function () {});
       }
     }
 
@@ -88,49 +88,30 @@ function renderPost() {
       Prism.highlightAllUnder(el);
     }
 
-    // ---- Code copy buttons ----
+    // ---- Copy buttons (code, math, tikz, mermaid) ----
     el.querySelectorAll("pre").forEach(function (pre) {
       if (pre.classList.contains("tikz-src") || pre.classList.contains("mermaid") || pre.querySelector(".copy-btn"))
         return;
-      var btn = document.createElement("button");
-      btn.className = "copy-btn";
-      btn.textContent = "copy";
-      btn.title = "Copy code to clipboard";
-      btn.addEventListener("click", function () {
-        var code = pre.querySelector("code");
-        var text = code ? code.textContent : pre.textContent;
-        navigator.clipboard.writeText(text).then(function () {
-          btn.textContent = "copied";
-          setTimeout(function () { btn.textContent = "copy"; }, 1500);
-        });
-      });
-      pre.style.position = "relative";
-      pre.appendChild(btn);
+      var code = pre.querySelector("code");
+      var text = code ? code.textContent : pre.textContent;
+      addCopyBtn([pre], "copy", "Copy code to clipboard", text);
+    });
+    el.querySelectorAll(".math-display").forEach(function (div) {
+      addCopyBtn([div], "copy tex", "Copy TeX source", div.getAttribute("data-latex"));
     });
 
-    // ---- Math copy buttons ----
-    el.querySelectorAll(".math-display").forEach(function (div) {
-      var latex = div.getAttribute("data-latex");
-      if (!latex || div.querySelector(".math-copy-btn")) return;
-      var btn = document.createElement("button");
-      btn.className = "math-copy-btn";
-      btn.textContent = "copy tex";
-      btn.title = "Copy TeX source";
-      btn.addEventListener("click", function () {
-        navigator.clipboard.writeText(latex).then(function () {
-          btn.textContent = "copied";
-          setTimeout(function () { btn.textContent = "copy tex"; }, 1500);
-        });
-      });
-      div.style.position = "relative";
-      div.appendChild(btn);
-    });
+    // ---- Pin buttons on labeled blocks ----
+    setupBlockPinButtons(el);
 
     // ---- Footnote repositioning (sidenotes on desktop) ----
     repositionFootnotes(el);
 
     // ---- Hover preview tooltips (unified) ----
     setupTooltips(el);
+
+    // ---- Tooltips on pinned panel ----
+    var pinnedPanel = document.querySelector(".pinned-panel");
+    if (pinnedPanel) setupTooltips(pinnedPanel);
 
     // ---- Media embeds ----
     setupMediaEmbeds(el);
@@ -141,18 +122,21 @@ function renderPost() {
 // Shared helpers
 // ============================================================
 
-function addCopyBtn(nodes, label, title) {
+function addCopyBtn(nodes, label, title, textOverride) {
   nodes.forEach(function (node) {
-    if (node.querySelector(".math-copy-btn")) return;
-    var source = node.getAttribute("data-source");
+    if (node.querySelector(".copy-btn")) return;
+    var source = textOverride || node.getAttribute("data-source");
     if (!source) return;
     var btn = document.createElement("button");
-    btn.className = "math-copy-btn";
+    btn.className = "copy-btn";
     btn.textContent = label;
     btn.title = title;
     btn.addEventListener("click", function () {
       navigator.clipboard.writeText(source).then(function () {
         btn.textContent = "copied";
+        setTimeout(function () { btn.textContent = label; }, 1500);
+      }).catch(function () {
+        btn.textContent = "failed";
         setTimeout(function () { btn.textContent = label; }, 1500);
       });
     });
@@ -270,6 +254,7 @@ function repositionFootnotes(el) {
 var _tooltipStack = [];
 var _tooltipShowTimer = null;
 var _tooltipCooldown = 0;
+var _tooltipCooldownDuration = 150; // ms before re-showing after hide
 var _ogMetadata = null;
 
 // Load pre-fetched OG metadata for external links
@@ -374,6 +359,7 @@ function hideTooltip() {
   for (var i = 0; i < _tooltipStack.length; i++) {
     clearTimeout(_tooltipStack[i]._hideTimer);
     _tooltipStack[i].classList.remove("visible");
+    _tooltipStack[i].style.pointerEvents = "none";
   }
   _tooltipCooldown = Date.now();
 }
@@ -470,6 +456,8 @@ function setupTooltips(el, depth) {
       // Add pin button for blocks that have label metadata
       var blockLabel = link.getAttribute("data-block-label");
       if (blockLabel) {
+        // Capture content before adding the pin button so it doesn't end up in previews
+        var contentForPin = tooltip.innerHTML;
         var pinBtn = document.createElement("button");
         pinBtn.className = "tooltip-pin-btn";
         var pinned = isBlockPinned(blockLabel);
@@ -487,7 +475,7 @@ function setupTooltips(el, depth) {
               kind: link.getAttribute("data-block-kind") || "",
               title: link.getAttribute("data-block-title") || "",
               number: link.getAttribute("data-block-number") || "",
-              preview: link.getAttribute("data-preview") || "",
+              preview: contentForPin,
               href: link.getAttribute("href") || ""
             });
             pinBtn.textContent = "unpin";
@@ -503,138 +491,152 @@ function setupTooltips(el, depth) {
       }
     }
 
-    // Cross-references and auto-definitions (both have data-preview)
-    el.querySelectorAll("[data-preview]").forEach(function (link) {
-      if (link._tooltipBound) return;
-      link._tooltipBound = true;
-      link.addEventListener("mouseenter", function () {
-        if (depth === 0 && Date.now() - _tooltipCooldown < 500) return;
-        clearTimeout(_tooltipShowTimer);
-        _tooltipShowTimer = setTimeout(function () {
-          // Try to find the rendered block on the current page for exact formatting
-          var href = link.getAttribute("href");
-          var blockId = href && href.startsWith("#") ? href.slice(1) : null;
-          var blockEl = blockId ? document.getElementById(blockId) : null;
-          if (blockEl && blockEl.classList.contains("labeled-block")) {
-            var clone = blockEl.cloneNode(true);
-            // Remove copy buttons from clone
-            clone.querySelectorAll(".math-copy-btn, .copy-btn").forEach(function(b) { b.remove(); });
-            showTooltipWithContent(link, clone.innerHTML, false);
-          } else {
-            var preview = link.getAttribute("data-preview");
-            if (!preview) return;
-            showTooltipWithContent(link, markdownPreview(preview), true);
-          }
-        }, 150);
+    // Shared: bind mouseenter/mouseleave tooltip handlers to a set of links
+    function bindTooltip(links, contentFn) {
+      links.forEach(function (link) {
+        if (link._tooltipBound) return;
+        link._tooltipBound = true;
+        link.addEventListener("mouseenter", function () {
+          if (depth === 0 && Date.now() - _tooltipCooldown < _tooltipCooldownDuration) return;
+          clearTimeout(_tooltipShowTimer);
+          _tooltipShowTimer = setTimeout(function () { contentFn(link); }, 150);
+        });
+        link.addEventListener("mouseleave", function () {
+          clearTimeout(_tooltipShowTimer);
+          scheduleHideTooltipAt(depth);
+        });
       });
-      link.addEventListener("mouseleave", function () {
-        clearTimeout(_tooltipShowTimer);
-        scheduleHideTooltipAt(depth);
-      });
+    }
+
+    // Cross-references and auto-definitions
+    bindTooltip(el.querySelectorAll("[data-preview]"), function (link) {
+      var href = link.getAttribute("href");
+      var blockId = href && href.startsWith("#") ? href.slice(1) : null;
+      var blockEl = blockId ? document.getElementById(blockId) : null;
+      if (blockEl && blockEl.classList.contains("labeled-block")) {
+        var clone = blockEl.cloneNode(true);
+        clone.querySelectorAll(".copy-btn, .block-pin-btn").forEach(function(b) { b.remove(); });
+        showTooltipWithContent(link, clone.innerHTML, false);
+      } else {
+        var preview = link.getAttribute("data-preview");
+        if (preview) showTooltipWithContent(link, markdownPreview(preview), true);
+      }
     });
 
-    // Internal link previews (posts with data-post-title)
-    el.querySelectorAll("a[data-post-title]").forEach(function (link) {
-      if (link.hasAttribute("data-preview") || link._tooltipBound) return;
-      link._tooltipBound = true;
-      link.addEventListener("mouseenter", function () {
-        clearTimeout(_tooltipShowTimer);
-        _tooltipShowTimer = setTimeout(function () {
-          var title = link.getAttribute("data-post-title");
-          if (!title) return;
-          var desc = link.getAttribute("data-post-desc");
-          var tags = link.getAttribute("data-post-tags");
-          var series = link.getAttribute("data-post-series");
-          var html = "<strong>" + title + "</strong>";
-          if (desc) html += "<p>" + desc + "</p>";
-          if (series) html += '<p style="color:var(--accent);font-size:0.8rem">' + series + "</p>";
-          if (tags) html += '<p style="font-size:0.75rem;color:var(--text-muted)">' + tags.split(", ").map(function(t) { return "#" + t; }).join(" ") + "</p>";
-          showTooltipWithContent(link, html, false);
-        }, 150);
-      });
-      link.addEventListener("mouseleave", function () {
-        clearTimeout(_tooltipShowTimer);
-        scheduleHideTooltipAt(depth);
-      });
-    });
+    // Internal post links
+    bindTooltip(
+      Array.from(el.querySelectorAll("a[data-post-title]")).filter(function (l) {
+        return !l.hasAttribute("data-preview");
+      }),
+      function (link) {
+        var title = link.getAttribute("data-post-title");
+        if (!title) return;
+        var desc = link.getAttribute("data-post-desc");
+        var tags = link.getAttribute("data-post-tags");
+        var series = link.getAttribute("data-post-series");
+        var html = "<strong>" + title + "</strong>";
+        if (desc) html += "<p>" + desc + "</p>";
+        if (series) html += '<p style="color:var(--accent);font-size:0.8rem">' + series + "</p>";
+        if (tags) html += '<p style="font-size:0.75rem;color:var(--text-muted)">' + tags.split(", ").map(function(t) { return "#" + t; }).join(" ") + "</p>";
+        showTooltipWithContent(link, html, false);
+      }
+    );
 
     // Internal non-post links (e.g. /about, /projects)
-    el.querySelectorAll("a[href^='/']").forEach(function (link) {
-      if (link.hasAttribute("data-post-title") || link.hasAttribute("data-preview") || link._tooltipBound) return;
-      if (link.getAttribute("href").startsWith("/blog/")) return;
-      link._tooltipBound = true;
-      link.addEventListener("mouseenter", function () {
-        clearTimeout(_tooltipShowTimer);
-        _tooltipShowTimer = setTimeout(function () {
-          var href = link.getAttribute("href");
-          if (!href) return;
-          var linkText = link.textContent.trim();
-          showTooltipWithContent(link, '<div class="ext-preview"><div class="ext-title">' + linkText + '</div><div class="ext-path">' + href + '</div></div>', false);
-        }, 150);
-      });
-      link.addEventListener("mouseleave", function () {
-        clearTimeout(_tooltipShowTimer);
-        scheduleHideTooltipAt(depth);
-      });
-    });
+    bindTooltip(
+      Array.from(el.querySelectorAll("a[href^='/']")).filter(function (l) {
+        return !l.hasAttribute("data-post-title") && !l.hasAttribute("data-preview")
+          && !l.getAttribute("href").startsWith("/blog/");
+      }),
+      function (link) {
+        var href = link.getAttribute("href");
+        if (!href) return;
+        var linkText = link.textContent.trim();
+        showTooltipWithContent(link, '<div class="ext-preview"><div class="ext-title">' + linkText + '</div><div class="ext-path">' + href + '</div></div>', false);
+      }
+    );
 
-    // External link previews
-    el.querySelectorAll("a[href^='http']").forEach(function (link) {
-      if (link.hasAttribute("data-post-title") || link.hasAttribute("data-preview") || link._tooltipBound) return;
-      link._tooltipBound = true;
-      link.addEventListener("mouseenter", function () {
-        clearTimeout(_tooltipShowTimer);
-        _tooltipShowTimer = setTimeout(function () {
-          var href = link.getAttribute("href");
-          if (!href) return;
-          try { var url = new URL(href); } catch (e) { return; }
-          var favicon = "https://www.google.com/s2/favicons?domain=" + url.hostname + "&sz=32";
-          var linkText = link.textContent.trim();
-          var displayText = linkText !== href ? linkText : "";
-          var path = url.pathname + url.search + url.hash;
-          if (path.length > 60) path = path.slice(0, 57) + "...";
+    // External links
+    bindTooltip(
+      Array.from(el.querySelectorAll("a[href^='http']")).filter(function (l) {
+        return !l.hasAttribute("data-post-title") && !l.hasAttribute("data-preview");
+      }),
+      function (link) {
+        var href = link.getAttribute("href");
+        if (!href) return;
+        try { var url = new URL(href); } catch (e) { return; }
+        var favicon = "https://www.google.com/s2/favicons?domain=" + url.hostname + "&sz=32";
+        var linkText = link.textContent.trim();
+        var displayText = linkText !== href ? linkText : "";
+        var path = url.pathname + url.search + url.hash;
+        if (path.length > 60) path = path.slice(0, 57) + "...";
 
-          // Check for pre-fetched OG metadata
-          var og = _ogMetadata && _ogMetadata[href];
-          var html = '<div class="ext-preview">';
-          html += '<div class="ext-preview-header">';
-          html += '<img class="ext-favicon" src="' + favicon + '" width="16" height="16" alt="" />';
-          html += '<span class="ext-domain">' + url.hostname + '</span></div>';
-          if (og && og.title) {
-            html += '<div class="ext-title">' + escapeHtml(og.title) + '</div>';
-          } else if (displayText && displayText !== url.hostname) {
-            html += '<div class="ext-title">' + displayText + '</div>';
-          }
-          if (og && og.description) {
-            html += '<div class="ext-desc">' + escapeHtml(og.description) + '</div>';
-          }
-          if (og && og.image) {
-            html += '<img class="ext-image" src="' + escapeHtml(og.image) + '" alt="" />';
-          }
-          if (path !== "/") html += '<div class="ext-path">' + path + '</div>';
-          html += '</div>';
-          showTooltipWithContent(link, html, false);
-        }, 150);
-      });
-      link.addEventListener("mouseleave", function () {
-        clearTimeout(_tooltipShowTimer);
-        scheduleHideTooltipAt(depth);
-      });
-    });
+        var og = _ogMetadata && _ogMetadata[href];
+        var html = '<div class="ext-preview">';
+        html += '<div class="ext-preview-header">';
+        html += '<img class="ext-favicon" src="' + favicon + '" width="16" height="16" alt="" />';
+        html += '<span class="ext-domain">' + url.hostname + '</span></div>';
+        if (og && og.title) {
+          html += '<div class="ext-title">' + escapeHtml(og.title) + '</div>';
+        } else if (displayText && displayText !== url.hostname) {
+          html += '<div class="ext-title">' + displayText + '</div>';
+        }
+        if (og && og.description) {
+          html += '<div class="ext-desc">' + escapeHtml(og.description) + '</div>';
+        }
+        if (og && og.image) {
+          html += '<img class="ext-image" src="' + escapeHtml(og.image) + '" alt="" />';
+        }
+        if (path !== "/") html += '<div class="ext-path">' + path + '</div>';
+        html += '</div>';
+        showTooltipWithContent(link, html, false);
+      }
+    );
 }
 
 function markdownPreview(md) {
-  return md
-    .replace(/```(\w*)\n?([\s\S]*?)```/g, "<pre><code>$2</code></pre>")
+  // Step 1: Extract math/code blocks into placeholders so text transforms don't mangle them
+  var placeholders = [];
+  function placeholder(content) {
+    var id = "\x00PLACEHOLDER_" + placeholders.length + "\x00";
+    placeholders.push(content);
+    return id;
+  }
+
+  var s = md;
+
+  // Fenced code blocks
+  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, function(_, lang, code) {
+    return placeholder("<pre><code>" + code + "</code></pre>");
+  });
+
+  // LaTeX environments (align, gather, equation, etc.) — must come before $$ matching
+  s = s.replace(/\\begin\{(align|align\*|multline|split|gather|gather\*|equation|equation\*)\}([\s\S]*?)\\end\{\1\}/g, function(_, env, body) {
+    if (env === "equation" || env === "equation*") {
+      return placeholder("\\[" + body + "\\]");
+    }
+    return placeholder("\\[\\begin{" + env + "}" + body + "\\end{" + env + "}\\]");
+  });
+
+  // Display math $$...$$
+  s = s.replace(/\$\$([\s\S]+?)\$\$/g, function(_, body) {
+    return placeholder("\\[" + body + "\\]");
+  });
+
+  // Inline code `...` (before inline math to avoid conflicts)
+  s = s.replace(/`(.+?)`/g, function(_, code) {
+    return placeholder("<code>" + code + "</code>");
+  });
+
+  // Inline math $...$
+  s = s.replace(/\$(.+?)\$/g, function(_, body) {
+    return placeholder("\\(" + body + "\\)");
+  });
+
+  // Step 2: Text transforms on the remaining markdown
+  s = s
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, "<code>$1</code>")
-    .replace(/\$\$(.+?)\$\$/gs, "\\[$1\\]")
-    .replace(/\$(.+?)\$/g, "\\($1\\)")
-    .replace(/\\begin\{(align|align\*|multline|split)\}([\s\S]*?)\\end\{\1\}/g, "<div class=\"math-display\" data-latex=\"$2\">\\begin{$1}$2\\end{$1}</div>")
-    .replace(/\\begin\{(equation|equation\*)\}([\s\S]*?)\\end\{\1\}/g, "<div class=\"math-display\" data-latex=\"$2\">\\[$2\\]</div>")
-    .replace(/\\begin\{(gather|gather\*)\}([\s\S]*?)\\end\{\1\}/g, "<div class=\"math-display\" data-latex=\"$2\">\\begin{$1}$2\\end{$1}</div>")
-    // Lists: convert markdown list items to HTML
     .replace(/^(\d+)\.\s+(.+)$/gm, "<li>$2</li>")
     .replace(/^[-*]\s+(.+)$/gm, "<li>$1</li>")
     .replace(/(<li>.*<\/li>\n?)+/g, function(match) {
@@ -644,10 +646,16 @@ function markdownPreview(md) {
     .replace(/\n/g, " ")
     .replace(/^/, "<p>")
     .replace(/$/, "</p>")
-    // Clean up empty paragraphs
     .replace(/<p>\s*<\/p>/g, "")
     .replace(/<p>\s*(<ul>)/g, "$1")
     .replace(/(<\/ul>)\s*<\/p>/g, "$1");
+
+  // Step 3: Restore placeholders
+  for (var i = 0; i < placeholders.length; i++) {
+    s = s.replace("\x00PLACEHOLDER_" + i + "\x00", placeholders[i]);
+  }
+
+  return s;
 }
 
 // ============================================================
@@ -679,28 +687,27 @@ function setupMermaidZoom(el) {
       applyTransform();
     }, { passive: false });
 
-    container.addEventListener("mousedown", function (e) {
-      if (e.button !== 0) return;
-      state.dragging = true;
-      state.lastX = e.clientX;
-      state.lastY = e.clientY;
-      container.style.cursor = "grabbing";
-    });
-
-    window.addEventListener("mousemove", function (e) {
-      if (!state.dragging) return;
+    function onMouseMove(e) {
       state.tx += e.clientX - state.lastX;
       state.ty += e.clientY - state.lastY;
       state.lastX = e.clientX;
       state.lastY = e.clientY;
       applyTransform();
-    });
+    }
 
-    window.addEventListener("mouseup", function () {
-      if (state.dragging) {
+    container.addEventListener("mousedown", function (e) {
+      if (e.button !== 0 || state.dragging) return;
+      state.dragging = true;
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+      container.style.cursor = "grabbing";
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", function handler() {
         state.dragging = false;
         container.style.cursor = "grab";
-      }
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", handler);
+      });
     });
 
     container.addEventListener("dblclick", function () {
@@ -756,6 +763,92 @@ function setupMediaEmbeds(el) {
     dl.className = "media-download";
     dl.textContent = "download " + (title || type);
     div.appendChild(dl);
+  });
+}
+
+// ============================================================
+// Pin buttons on labeled blocks (hover to reveal)
+// ============================================================
+
+function setupBlockPinButtons(el) {
+  el.querySelectorAll(".labeled-block").forEach(function (block) {
+    if (block.querySelector(".block-pin-btn")) return;
+    var id = block.getAttribute("id");
+    if (!id) return;
+
+    var header = block.querySelector(".labeled-block-header");
+    if (!header) return;
+
+    // Extract block metadata from the rendered header
+    var headerText = header.textContent.trim();
+    var kind = "";
+    var number = "";
+    var title = "";
+    var strong = header.querySelector("strong");
+    if (strong) {
+      var parts = strong.textContent.replace(/\.$/, "").split(" ");
+      kind = (parts[0] || "").toLowerCase();
+      number = parts.slice(1).join(" ");
+    }
+    // Title is in parentheses after the strong tag
+    var fullText = header.textContent;
+    var parenMatch = fullText.match(/\(([^)]+)\)/);
+    if (parenMatch) title = parenMatch[1];
+
+    // For proof blocks, find the associated theorem/lemma from the previous sibling
+    if (kind === "proof" && !title) {
+      var prev = block.previousElementSibling;
+      if (prev && prev.classList.contains("labeled-block") && !prev.classList.contains("proof")) {
+        var prevHeader = prev.querySelector(".labeled-block-header");
+        if (prevHeader) {
+          var prevStrong = prevHeader.querySelector("strong");
+          var prevKind = prevStrong ? prevStrong.textContent.replace(/\.\s*$/, "").trim() : "";
+          var prevParen = prevHeader.textContent.match(/\(([^)]+)\)/);
+          var prevTitle = prevParen ? prevParen[1] : "";
+          title = prevTitle ? prevKind + ", " + prevTitle : prevKind;
+        }
+      }
+    }
+
+    // Get preview content (the block body text, not HTML)
+    var contentEl = block.querySelector(".labeled-block-content");
+    var preview = contentEl ? contentEl.textContent.trim().slice(0, 500) : "";
+
+    var btn = document.createElement("button");
+    btn.className = "block-pin-btn";
+    var pinned = isBlockPinned(id);
+    btn.textContent = pinned ? "unpin" : "pin";
+    btn.title = pinned ? "Unpin from sidebar" : "Pin to sidebar";
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (isBlockPinned(id)) {
+        removePinnedBlock(id);
+        btn.textContent = "pin";
+        btn.title = "Pin to sidebar";
+      } else {
+        // Get the raw markdown preview from the block's content
+        var rawPreview = contentEl ? contentEl.innerHTML : "";
+        addPinnedBlock({
+          label: id,
+          kind: kind,
+          title: title,
+          number: number,
+          preview: rawPreview,
+          href: window.location.pathname + "#" + id
+        });
+        btn.textContent = "unpin";
+        btn.title = "Unpin from sidebar";
+      }
+    });
+    // Sync button state when pins change from the panel side
+    window.addEventListener("pinned-blocks-changed", function () {
+      var nowPinned = isBlockPinned(id);
+      btn.textContent = nowPinned ? "unpin" : "pin";
+      btn.title = nowPinned ? "Unpin from sidebar" : "Pin to sidebar";
+    });
+
+    header.style.position = "relative";
+    header.appendChild(btn);
   });
 }
 

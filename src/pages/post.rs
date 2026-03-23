@@ -162,7 +162,7 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
         .outgoing_links()
         .iter()
         .map(|linked_post| {
-            let url = format!("/blog/{}", linked_post.slug);
+            let url = linked_post.href();
             let anchors = link_occurrences.get(&url).cloned().unwrap_or_default();
             PostLink::from_post(linked_post, &url, anchors)
         })
@@ -172,7 +172,7 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
         .incoming_links()
         .iter()
         .map(|linked_post| {
-            let url = format!("/blog/{}", linked_post.slug);
+            let url = linked_post.href();
             PostLink::from_post(linked_post, &url, vec![])
         })
         .collect();
@@ -459,23 +459,18 @@ fn render_series_navigation(post: &'static Post) -> Option<impl IntoView> {
 
     let part_number = current_index.map(|index| index + 1).unwrap_or(0);
 
-    let table_of_contents: Vec<(String, String, bool)> = series_posts
+    let table_of_contents_view = series_posts
         .iter()
-        .map(|series_post| {
-            (
-                format!("/blog/{}", series_post.slug),
-                series_post.title().to_string(),
-                series_post.slug == post.slug,
-            )
-        })
-        .collect();
-
-    let table_of_contents_view = table_of_contents
-        .into_iter()
-        .map(|(href, title, is_current)| {
+        .enumerate()
+        .map(|(i, series_post)| {
+            let num = format!("{}.", i + 1);
+            let href = series_post.href();
+            let title = series_post.title().to_string();
+            let is_current = series_post.slug == post.slug;
             if is_current {
                 view! {
                     <li>
+                        <span class="toc-num">{num}</span>
                         <strong>{title}</strong>
                     </li>
                 }
@@ -483,6 +478,7 @@ fn render_series_navigation(post: &'static Post) -> Option<impl IntoView> {
             } else {
                 view! {
                     <li>
+                        <span class="toc-num">{num}</span>
                         <A href=href>{title}</A>
                     </li>
                 }
@@ -497,12 +493,12 @@ fn render_series_navigation(post: &'static Post) -> Option<impl IntoView> {
                 <summary>
                     {format!("Part {} of {} \u{2014} {}", part_number, total, series_name)}
                 </summary>
-                <ol class="series-toc">{table_of_contents_view}</ol>
+                <ul class="series-toc">{table_of_contents_view}</ul>
             </details>
             <div class="series-prev-next">
                 {previous_post
                     .map(|series_post| {
-                        let href = format!("/blog/{}", series_post.slug);
+                        let href = series_post.href();
                         let label = format!("\u{25c2} {}", series_post.title());
                         view! {
                             <A href=href attr:class="series-prev">
@@ -512,7 +508,7 @@ fn render_series_navigation(post: &'static Post) -> Option<impl IntoView> {
                     })}
                 {next_post
                     .map(|series_post| {
-                        let href = format!("/blog/{}", series_post.slug);
+                        let href = series_post.href();
                         let label = format!("{} \u{25b8}", series_post.title());
                         view! {
                             <A href=href attr:class="series-next">
@@ -675,7 +671,7 @@ fn render_giscus() -> impl IntoView {
             .document_element()
             .and_then(|element| element.get_attribute("data-theme"))
             .unwrap_or_else(|| "dark".to_string());
-        let giscus_theme = if theme == "light" { "light" } else { "dark_dimmed" };
+        let giscus_theme = crate::components::giscus_theme_for(&theme);
 
         let script = document.create_element("script").unwrap();
         script.set_attribute("src", "https://giscus.app/client.js").unwrap();

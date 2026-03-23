@@ -11,8 +11,9 @@ sources: https://en.wikipedia.org/wiki/Group_representation
 
 Representation theory studies groups by letting them act on [[def:vector-space|vector spaces]]. This linearizes the problem, making tools from linear algebra available. The classic references are Serre[^serre] and Fulton & Harris[^fh].
 
-[^serre]: Jean-Pierre Serre, *Linear Representations of Finite Groups*, Springer, 1977.
-[^fh]: William Fulton & Joe Harris, *Representation Theory: A First Course*, Springer, 1991.
+[^serre]: Jean-Pierre Serre, _Linear Representations of Finite Groups_, Springer, 1977.
+
+[^fh]: William Fulton & Joe Harris, _Representation Theory: A First Course_, Springer, 1991.
 
 ## Representations
 
@@ -107,13 +108,13 @@ Characters are class functions: $\chi(ghg^{-1}) = \chi(h)$ for all $g, h \in G$.
 
 Characters encode essential information about representations:
 
-| Property | Character value |
-|---|---|
-| Dimension | $\chi(e) = \dim V$ |
-| Trivial rep | $\chi(g) = 1$ for all $g$ |
-| Direct sum | $\chi_{V \oplus W} = \chi_V + \chi_W$ |
+| Property       | Character value                                     |
+| -------------- | --------------------------------------------------- |
+| Dimension      | $\chi(e) = \dim V$                                  |
+| Trivial rep    | $\chi(g) = 1$ for all $g$                           |
+| Direct sum     | $\chi_{V \oplus W} = \chi_V + \chi_W$               |
 | Tensor product | $\chi_{V \otimes W}(g) = \chi_V(g) \cdot \chi_W(g)$ |
-| Dual rep | $\chi_{V^*}(g) = \overline{\chi_V(g)}$ |
+| Dual rep       | $\chi_{V^*}(g) = \overline{\chi_V(g)}$              |
 
 ```theorem Orthogonality Relations {#thm:orthogonality}
 Let $\chi_i, \chi_j$ be characters of [[def:irreducible]] representations of a finite [[def:group]] $G$ over $\mathbb{C}$. Then:
@@ -131,11 +132,11 @@ The [[def:symmetric-group|symmetric group]] $S_3$ has three conjugacy classes: $
 
 [^1]: A finite group has exactly as many irreducible representations (over $\mathbb{C}$) as conjugacy classes. Their dimensions satisfy $\sum d_i^2 = |G|$.
 
-| | $\{e\}$ | $\{(12),(13),(23)\}$ | $\{(123),(132)\}$ |
-|---|---|---|---|
-| Trivial $\chi_1$ | $1$ | $1$ | $1$ |
-| Sign $\chi_2$ | $1$ | $-1$ | $1$ |
-| Standard $\chi_3$ | $2$ | $0$ | $-1$ |
+|                   | $\{e\}$ | $\{(12),(13),(23)\}$ | $\{(123),(132)\}$ |
+| ----------------- | ------- | -------------------- | ----------------- |
+| Trivial $\chi_1$  | $1$     | $1$                  | $1$               |
+| Sign $\chi_2$     | $1$     | $-1$                 | $1$               |
+| Standard $\chi_3$ | $2$     | $0$                  | $-1$              |
 
 Check: $1^2 + 1^2 + 2^2 = 6 = |S_3|$ and the rows are orthogonal under the inner product $\langle \chi_i, \chi_j \rangle = \frac{1}{6}\sum_{g} \chi_i(g)\overline{\chi_j(g)}$.
 

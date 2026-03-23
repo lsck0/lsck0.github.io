@@ -287,10 +287,7 @@ pub fn GlobalSearch() -> impl IntoView {
                 let desc_score = fuzzy_score(&q, post.description());
                 let block_text = post.labeled_block_text();
                 let block_score = fuzzy_score(&q, &block_text).map(|s| s.saturating_mul(2));
-                let best = [title_score, desc_score, block_score]
-                    .into_iter()
-                    .flatten()
-                    .max();
+                let best = [title_score, desc_score, block_score].into_iter().flatten().max();
                 best.map(|score| (i, score))
             })
             .collect();
@@ -351,7 +348,7 @@ pub fn GlobalSearch() -> impl IntoView {
                 if let Some(&(post_idx, _)) = r.get(idx)
                     && let Some(post) = POSTS.get(post_idx)
                 {
-                    let href = format!("/blog/{}", post.slug);
+                    let href = post.href();
                     set_is_visible.set(false);
                     set_query.set(String::new());
                     navigate(&href, Default::default());
@@ -416,7 +413,7 @@ pub fn GlobalSearch() -> impl IntoView {
                                                 } else {
                                                     "global-search-item"
                                                 };
-                                                let href = format!("/blog/{}", post.slug);
+                                                let href = post.href();
                                                 let nav = nav.clone();
                                                 view! {
                                                     <div

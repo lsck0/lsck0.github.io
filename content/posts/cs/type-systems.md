@@ -7,9 +7,12 @@ tags: cs, plt, math
 publication: cs
 project: plt
 sources: https://en.wikipedia.org/wiki/Curry%E2%80%93Howard_correspondence
+toc: true
 ---
 
+```definition Curry-Howard Correspondence {#def:curry-howard}
 The **Curry-Howard correspondence** reveals that types are propositions, programs are proofs, and computation is proof simplification.
+```
 
 ## The Dictionary
 
@@ -26,7 +29,7 @@ The **Curry-Howard correspondence** reveals that types are propositions, program
 
 ## Example: Conjunction
 
-To prove $A \land B$, you need a proof of $A$ and a proof of $B$. In code, that's constructing a pair:
+To prove $A \land B$, you need a proof of $A$ and a proof of $B$. In code, that's constructing a pair (using [[cs/lambda-calculus#def:lambda-term]]):
 
 ```rust
 fn and_intro<A, B>(a: A, b: B) -> (A, B) {

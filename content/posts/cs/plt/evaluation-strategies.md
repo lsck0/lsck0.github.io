@@ -12,7 +12,11 @@ When a function is applied to an argument, *when* do we evaluate the argument? T
 
 ## Call-by-Value
 
-Evaluate the argument **before** passing it in. Most languages do this: C, Rust, Python, JavaScript.
+```definition Call-by-Value {#def:call-by-value}
+Evaluate the argument **before** passing it in. The argument expression is reduced to a value, then substituted into the function body.
+```
+
+Most languages do this: C, Rust, Python, JavaScript.
 
 ```rust
 fn square(x: i32) -> i32 { x * x }
@@ -25,13 +29,21 @@ Simple and predictable. But it evaluates arguments even if they're never used.
 
 ## Call-by-Name
 
-Pass the argument **unevaluated**, recompute it each time it's used. This is what textbook lambda calculus does.
+```definition Call-by-Name {#def:call-by-name}
+Pass the argument **unevaluated**, substituting the expression directly into the function body. It is recomputed each time it's used.
+```
+
+This is what textbook [[cs/lambda-calculus#def:lambda-term]] calculus does.
 
 If an argument is used twice, it's computed twice. If never used, it's never computed.
 
 ## Call-by-Need (Lazy)
 
-Like call-by-name, but **memoize** the result after first evaluation. Haskell uses this.
+```definition Call-by-Need {#def:call-by-need}
+Like call-by-name, but **memoize** the result after first evaluation. The argument is evaluated at most once and only when needed.
+```
+
+Haskell uses this.
 
 ```mermaid
 graph LR

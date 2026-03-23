@@ -2,6 +2,8 @@
 title: Graph Algorithms
 description: BFS, DFS, Dijkstra, and beyond — traversing and computing on graphs.
 tags: cs, algorithms
+publication: cs
+toc: true
 ---
 
 Graphs are fundamental data structures. This post covers classic graph algorithms.

@@ -179,7 +179,7 @@ Some text[^1] with a footnote.
 [^1]: The footnote content.
 ```
 
-On wide screens (≥1200px), footnotes float into the right margin as sidenotes.
+On wide screens (≥1201px), footnotes float into the right margin as sidenotes.
 On mobile devices, footnotes are grouped in a "Footnotes" section before the
 references and sources sections.
 
@@ -269,10 +269,10 @@ copies of their source code, making them findable via browser Ctrl+F search.
 - **Fuzzy search** — subsequence matching via nucleo-matcher (title 3× weight)
 - **Tag filtering** — click to cycle: neutral → include → exclude
 - **Bookmarks filter** — show only bookmarked posts
-- **Read/unread** — posts are marked "read" via localStorage when visited
+- **Read/unread** — posts are marked "read" via localStorage when visited; badge is clickable to toggle
 - **Series badge** — shows "[Series Name X/Y]" for series posts
 - **Pagination** — 10 posts per page
-- **View modes** — list, tree (folder structure), series (grouped by series with progress), bookmarks, graph (force-directed knowledge graph)
+- **View modes** — list, tree (folder structure), series (grouped by series with progress, collapsible standalone section), bookmarks, graph (force-directed knowledge graph)
 - **Post count** — shows filtered/total count when filters are active
 
 ### Post page features
@@ -285,6 +285,17 @@ copies of their source code, making them findable via browser Ctrl+F search.
 - **Scroll-to-top** — appears after scrolling past 50% viewport height
 - **Giscus comments** — powered by GitHub Discussions
 - **Read tracking** — marks post as read in localStorage
+- **Pin button** — hover over any labeled block (definition, theorem, etc.)
+  to reveal a "pin" button that saves it to the pinned sidebar panel
+- **Pinned panel** — fixed right sidebar showing pinned blocks with rendered
+  math, cross-reference tooltips, and source links. Items in the panel are
+  hoverable for nested definition previews. When open on wide screens, main
+  content reflows left to avoid overlap (sidenote footnotes become inline).
+- **Study mode** — "study" button in pinned panel header activates Anki-style
+  flashcards: shows the block kind/title as the front, click "reveal" to show
+  the content, then navigate prev/next through all pinned blocks
+- **Mobile pins** — on small screens, a floating button shows the pin count;
+  tapping it opens the pinned panel as a fullscreen overlay
 
 ## Site Metadata (`content/meta.toml`)
 
@@ -358,11 +369,12 @@ Bookmark and read state is managed via localStorage through a centralized
 `components/storage` module. All pages use the same module — no duplicated
 localStorage access patterns.
 
-| Key pattern       | Value                | Description          |
-| ----------------- | -------------------- | -------------------- |
-| `bookmark:{slug}` | `"1"`                | Post is bookmarked   |
-| `read:{slug}`     | timestamp            | Post has been viewed |
-| `theme`           | `"dark"` / `"light"` | Current theme        |
+| Key pattern       | Value                | Description                              |
+| ----------------- | -------------------- | ---------------------------------------- |
+| `bookmark:{slug}` | `"1"`                | Post is bookmarked                       |
+| `read:{slug}`     | timestamp            | Post has been viewed                     |
+| `theme`           | `"dark"` / `"light"` | Current theme                            |
+| `pinned-blocks`   | JSON array           | Pinned labeled blocks with preview HTML  |
 
 ## Content Pipeline Architecture
 
@@ -435,13 +447,17 @@ All text fields support the same segment array syntax as projects.
 
 ## Print / PDF Export
 
-`Ctrl+P` or the print button triggers optimized print styles:
+`Ctrl+P` or the print button triggers LaTeX-like print styles:
 
-- 9pt base font for compact output
+- Serif font (Computer Modern / Times), 10pt base, justified text
+- Centered title block, text-indent for body paragraphs
+- Italicized theorem content, upright proof content (traditional math typesetting)
+- A4 page margins (2cm horizontal, 2.5cm vertical)
 - TikZ diagrams forced visible (no dark-mode invert filter)
 - Mermaid diagrams re-rendered in light theme before print
 - Copy buttons, hover underlines, and navigation hidden
 - KaTeX math forced to black text
+- External links show URLs after link text
 
 ## OpenSearch
 
