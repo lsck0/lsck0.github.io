@@ -11,8 +11,9 @@ use crate::{
     components::{
         layout::Layout,
         storage::{is_bookmarked, is_read, mark_read, mark_unread, set_bookmarked},
+        toggle_in_set,
     },
-    models::{meta::META, post::POSTS, search::fuzzy_score},
+    models::{meta::META, post::POSTS, search::score_post},
     pages::graph::GraphView,
 };
 
@@ -38,6 +39,13 @@ enum ViewMode {
     Bookmarks,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum ReadFilter {
+    All,
+    Unread,
+    Read,
+}
+
 // ============================================================
 // Tree helpers
 // ============================================================
@@ -47,7 +55,7 @@ fn build_folder_tree<'a>(
 ) -> BTreeMap<&'a str, Vec<&'a crate::models::post::Post>> {
     let mut tree: BTreeMap<&str, Vec<&crate::models::post::Post>> = BTreeMap::new();
     for post in posts {
-        let folder = if post.folder.is_empty() { "/" } else { post.folder };
+        let folder = if post.folder().is_empty() { "/" } else { post.folder() };
         tree.entry(folder).or_default().push(post);
     }
     return tree;
@@ -63,6 +71,7 @@ pub fn BlogPage() -> impl IntoView {
     let (tag_states, set_tag_states) = signal(Vec::<(String, TagState)>::new());
     let (page, set_page) = signal(0usize);
     let (view_mode, set_view_mode) = signal(ViewMode::List);
+    let (read_filter, set_read_filter) = signal(ReadFilter::All);
     let (collapsed_folders, set_collapsed_folders) = signal(BTreeSet::<String>::new());
     let (collapsed_series, set_collapsed_series) = signal(BTreeSet::<String>::new());
 
@@ -100,6 +109,7 @@ pub fn BlogPage() -> impl IntoView {
 
     let reset_filters = move |_| {
         set_search.set(String::new());
+        set_read_filter.set(ReadFilter::All);
         set_tag_states.update(|states| {
             for entry in states.iter_mut() {
                 entry.1 = TagState::Neutral;
@@ -107,8 +117,11 @@ pub fn BlogPage() -> impl IntoView {
         });
     };
 
-    let has_active_filters =
-        move || !search.get().is_empty() || tag_states.get().iter().any(|(_, state)| *state != TagState::Neutral);
+    let has_active_filters = move || {
+        !search.get().is_empty()
+            || read_filter.get() != ReadFilter::All
+            || tag_states.get().iter().any(|(_, state)| *state != TagState::Neutral)
+    };
 
     let filtered_slugs = RwSignal::new(Vec::<usize>::new());
 
@@ -120,6 +133,7 @@ pub fn BlogPage() -> impl IntoView {
         let query_text = search.get().to_lowercase();
         let states = tag_states.get();
         let mode = view_mode.get();
+        let read_mode = read_filter.get();
 
         let included: Vec<&str> = states
             .iter()
@@ -144,29 +158,30 @@ pub fn BlogPage() -> impl IntoView {
             if mode != ViewMode::Bookmarks {
                 return true;
             }
-            is_bookmarked(post.slug)
+            is_bookmarked(post.slug())
+        };
+
+        let read_status_filter = |post: &&crate::models::post::Post| -> bool {
+            match read_mode {
+                ReadFilter::All => true,
+                ReadFilter::Unread => !is_read(post.slug()),
+                ReadFilter::Read => is_read(post.slug()),
+            }
         };
 
         let indices: Vec<usize> = if query_text.is_empty() {
             POSTS
                 .iter()
                 .enumerate()
-                .filter(|(_, post)| tag_filter(post) && bookmark_filter(post))
+                .filter(|(_, post)| tag_filter(post) && bookmark_filter(post) && read_status_filter(post))
                 .map(|(index, _)| index)
                 .collect()
         } else {
             let mut scored: Vec<(usize, u32)> = POSTS
                 .iter()
                 .enumerate()
-                .filter(|(_, post)| tag_filter(post) && bookmark_filter(post))
-                .filter_map(|(index, post)| {
-                    let title_score = fuzzy_score(&query_text, post.title()).map(|score| score.saturating_mul(3));
-                    let body_score = fuzzy_score(&query_text, post.body);
-                    let block_text = post.labeled_block_text();
-                    let block_score = fuzzy_score(&query_text, &block_text).map(|score| score.saturating_mul(2));
-                    let best = [title_score, body_score, block_score].into_iter().flatten().max();
-                    best.map(|score| (index, score))
-                })
+                .filter(|(_, post)| tag_filter(post) && bookmark_filter(post) && read_status_filter(post))
+                .filter_map(|(index, post)| score_post(&query_text, post).map(|score| (index, score)))
                 .collect();
 
             scored.sort_by_key(|entry| std::cmp::Reverse(entry.1));
@@ -245,6 +260,45 @@ pub fn BlogPage() -> impl IntoView {
                         {view_btn(ViewMode::Series, "series")}
                         {view_btn(ViewMode::Bookmarks, "bookmarks")}
                         {view_btn(ViewMode::Graph, "graph")}
+                    </div>
+
+                    <div class="blog-read-filter">
+                        <button
+                            class=move || {
+                                if read_filter.get() == ReadFilter::All {
+                                    "read-filter active"
+                                } else {
+                                    "read-filter"
+                                }
+                            }
+                            on:click=move |_| set_read_filter.set(ReadFilter::All)
+                        >
+                            "all"
+                        </button>
+                        <button
+                            class=move || {
+                                if read_filter.get() == ReadFilter::Unread {
+                                    "read-filter active"
+                                } else {
+                                    "read-filter"
+                                }
+                            }
+                            on:click=move |_| set_read_filter.set(ReadFilter::Unread)
+                        >
+                            "unread"
+                        </button>
+                        <button
+                            class=move || {
+                                if read_filter.get() == ReadFilter::Read {
+                                    "read-filter active"
+                                } else {
+                                    "read-filter"
+                                }
+                            }
+                            on:click=move |_| set_read_filter.set(ReadFilter::Read)
+                        >
+                            "read"
+                        </button>
                     </div>
 
                     <div class="blog-filters">
@@ -438,14 +492,10 @@ fn render_tree_view(
                                     on:click=move |_| {
                                         let key = folder_key.clone();
                                         set_collapsed_folders
-                                            .update(|set| {
-                                                if !set.remove(&key) {
-                                                    set.insert(key);
-                                                }
-                                            });
+                                            .update(|set| toggle_in_set(set, &key));
                                     }
                                 >
-                                    <span class="tree-icon">{icon}</span>
+                                    <span class="section-icon">{icon}</span>
                                     <span class="tree-folder-name">{folder_display.clone()}</span>
                                     <span class="tree-folder-count">{format!("({count})")}</span>
                                 </button>
@@ -454,13 +504,13 @@ fn render_tree_view(
                                         let items = folder_posts
                                             .into_iter()
                                             .map(|post| {
-                                                let slug = post.slug.to_string();
-                                                let (read_sig, set_read_sig) = signal(is_read(post.slug));
+                                                let slug = post.slug().to_string();
+                                                let (read_sig, set_read_sig) = signal(is_read(post.slug()));
                                                 let slug_display = post
-                                                    .slug
+                                                    .slug()
                                                     .rsplit('/')
                                                     .next()
-                                                    .unwrap_or(post.slug);
+                                                    .unwrap_or(post.slug());
                                                 view! {
                                                     <div class="tree-file">
                                                         <A href=post.href() attr:class="tree-file-link">
@@ -519,7 +569,7 @@ fn render_series_view(
                         let total = series_posts.len();
                         let read_count = series_posts
                             .iter()
-                            .filter(|post| is_read(post.slug))
+                            .filter(|post| is_read(post.slug()))
                             .count();
                         let is_collapsed = collapsed.contains(&name);
                         let name_key = name.clone();
@@ -531,15 +581,10 @@ fn render_series_view(
                                     class="series-header-btn"
                                     on:click=move |_| {
                                         let key = name_key.clone();
-                                        set_collapsed_series
-                                            .update(|set| {
-                                                if !set.remove(&key) {
-                                                    set.insert(key);
-                                                }
-                                            });
+                                        set_collapsed_series.update(|set| toggle_in_set(set, &key));
                                     }
                                 >
-                                    <span class="tree-icon">{icon}</span>
+                                    <span class="section-icon">{icon}</span>
                                     <span class="series-name">{name.clone()}</span>
                                     <span class="series-progress">
                                         {format!("{read_count}/{total}")}
@@ -551,8 +596,8 @@ fn render_series_view(
                                             .into_iter()
                                             .enumerate()
                                             .map(|(i, post)| {
-                                                let slug = post.slug.to_string();
-                                                let (read_sig, set_read_sig) = signal(is_read(post.slug));
+                                                let slug = post.slug().to_string();
+                                                let (read_sig, set_read_sig) = signal(is_read(post.slug()));
                                                 view! {
                                                     <div class="series-entry">
                                                         <span class="series-num">{format!("{}.", i + 1)}</span>
@@ -575,15 +620,15 @@ fn render_series_view(
                         let total = standalone.len();
                         let read_count = standalone
                             .iter()
-                            .filter(|post| is_read(post.slug))
+                            .filter(|post| is_read(post.slug()))
                             .count();
                         let is_collapsed = collapsed.contains("__standalone__");
                         let icon = if is_collapsed { "\u{25b6}" } else { "\u{25bc}" };
                         let items = standalone
                             .into_iter()
                             .map(|post| {
-                                let slug = post.slug.to_string();
-                                let (read_sig, set_read_sig) = signal(is_read(post.slug));
+                                let slug = post.slug().to_string();
+                                let (read_sig, set_read_sig) = signal(is_read(post.slug()));
                                 view! {
                                     <div class="series-entry">
                                         <A href=post.href() attr:class="series-link">
@@ -601,15 +646,10 @@ fn render_series_view(
                                     class="series-header-btn"
                                     on:click=move |_| {
                                         let key = "__standalone__".to_string();
-                                        set_collapsed_series
-                                            .update(|set| {
-                                                if !set.remove(&key) {
-                                                    set.insert(key);
-                                                }
-                                            });
+                                        set_collapsed_series.update(|set| toggle_in_set(set, &key));
                                     }
                                 >
-                                    <span class="tree-icon">{icon}</span>
+                                    <span class="section-icon">{icon}</span>
                                     <span class="series-name">"Standalone"</span>
                                     <span class="series-progress">
                                         {format!("{read_count}/{total}")}
@@ -642,7 +682,7 @@ fn render_graph_view(
     let visible_slugs = Signal::derive(move || {
         filtered_posts()
             .iter()
-            .map(|post| post.slug.to_string())
+            .map(|post| post.slug().to_string())
             .collect::<Vec<_>>()
     });
     view! {
@@ -657,19 +697,19 @@ fn render_graph_view(
 // ============================================================
 
 fn render_post_card(post: &crate::models::post::Post) -> impl IntoView {
-    let slug = post.slug.to_string();
+    let slug = post.slug().to_string();
     let slug_for_read = slug.clone();
     let href = post.href();
     let title = post.title().to_string();
     let date = post.date_formatted();
-    let (read_sig, set_read_sig) = signal(is_read(post.slug));
-    let (bookmarked, set_bookmarked_sig) = signal(is_bookmarked(post.slug));
+    let (read_sig, set_read_sig) = signal(is_read(post.slug()));
+    let (bookmarked, set_bookmarked_sig) = signal(is_bookmarked(post.slug()));
 
     let series_hint = post.series().map(|name| {
         let series_posts = post.series_posts();
         let series_idx = series_posts
             .iter()
-            .position(|series_post| series_post.slug == post.slug)
+            .position(|series_post| series_post.slug() == post.slug())
             .map(|index| index + 1)
             .unwrap_or(0);
         let total = series_posts.len();

@@ -19,6 +19,8 @@ This website stores the following data in your browser's localStorage:
 - **Theme preference** (light/dark mode)
 - **Reading history** (which posts you have read)
 - **Bookmarks** (posts you have bookmarked)
+- **Pinned blocks** (definitions/theorems you have pinned for reference)
+- **Study scores** (spaced repetition progress for pinned blocks)
 
 This data does not leave your browser and is never transmitted to any server.
 

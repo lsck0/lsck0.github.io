@@ -9,13 +9,7 @@ toc: true
 sources: https://en.wikipedia.org/wiki/Group_(mathematics), https://en.wikipedia.org/wiki/Isomorphism_theorems
 ---
 
-The foundational treatment follows Lang[^lang] and Dummit & Foote[^df]. We also draw on Aluffi[^aluffi] for the categorical perspective.
-
-[^lang]: Serge Lang, _Algebra_, 3rd ed., Springer, 2002.
-
-[^df]: David S. Dummit & Richard M. Foote, _Abstract Algebra_, 3rd ed., Wiley, 2004.
-
-[^aluffi]: Paolo Aluffi, _Algebra: Chapter 0_, AMS, 2009.
+The foundational treatment follows Lang [@lang_algebra] and Dummit & Foote [@dummit_foote]. We also draw on Aluffi [@aluffi] for the categorical perspective.
 
 ## Groups
 
@@ -115,6 +109,10 @@ If $\varphi: G \to H$ is a [[def:group-hom]], then $\ker(\varphi) \trianglelefte
 $$G / \ker(\varphi) \cong \text{im}(\varphi)$$
 ```
 
+```equation First Isomorphism {#eq:first-iso}
+G / \ker(\varphi) \cong \text{im}(\varphi)
+```
+
 ```proof {#proof:group-iso-1}
 Consider the map $\bar{\varphi}: G/\ker(\varphi) \to \text{im}(\varphi)$ defined by $\bar{\varphi}(g\ker(\varphi)) = \varphi(g)$. This is well-defined: if $g\ker(\varphi) = g'\ker(\varphi)$, then $g^{-1}g' \in \ker(\varphi)$, so $\varphi(g) = \varphi(g')$. It is a homomorphism since $\varphi$ is, and it is bijective by construction.
 ```
@@ -128,7 +126,7 @@ The universal property of the quotient group:
 \end{tikzcd}
 ```
 
-Here $\pi$ is the canonical projection and $\bar{\varphi}$ is the induced isomorphism from [[thm:group-iso-1]].
+Here $\pi$ is the canonical projection and $\bar{\varphi}$ is the induced isomorphism [[eq:first-iso]] from [[thm:group-iso-1]].
 
 ```note
 The first isomorphism theorem has analogues in every algebraic category: [[thm:ring-iso-1|rings]], modules, and vector spaces ([[thm:rank-nullity]]). In category theory, this reflects the fact that every morphism factors as an epi followed by a mono.

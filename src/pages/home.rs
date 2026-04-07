@@ -126,7 +126,7 @@ pub fn HomePage() -> impl IntoView {
             <div class="home-content">
                 <div class="home-hero">
                     <div class="home-lambda">{"\u{03bb}"}</div>
-                    <h1 class="home-title">"/dev/lsck0"</h1>
+                    <h1 class="home-title">"Luca Sandrock"</h1>
                     <div class="home-subtitle">"mathematician and software engineer"</div>
                 </div>
 
@@ -190,7 +190,12 @@ fn accent_rgb() -> &'static str {
 }
 
 fn run_particle_bg(canvas: HtmlCanvasElement, running: RwSignal<bool>) {
-    let ctx: CanvasRenderingContext2d = canvas.get_context("2d").unwrap().unwrap().dyn_into().unwrap();
+    let Ok(Some(ctx_obj)) = canvas.get_context("2d") else {
+        return;
+    };
+    let Ok(ctx) = ctx_obj.dyn_into::<CanvasRenderingContext2d>() else {
+        return;
+    };
 
     let width = canvas.offset_width().max(1) as u32;
     let height = canvas.offset_height().max(1) as u32;

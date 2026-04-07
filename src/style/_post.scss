@@ -23,9 +23,9 @@
   margin-bottom: 1rem;
 }
 
-// ---- Table of Contents ----
+// ---- Shared details panel (TOC + series nav) ----
 
-.post-toc {
+%details-panel {
   border: 1px solid var(--border);
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
@@ -37,31 +37,39 @@
     color: var(--text);
   }
 
-  nav { margin-top: 0.5rem; }
-
-  ul {
+  // Override .content ul/ol margins when panel is inside .content
+  ul, ol {
     list-style: none;
-    padding-left: 0;
+    padding-left: 0 !important;
+    margin: 0.5rem 0 !important;
+  }
 
-    li {
-      margin: 0.25rem 0;
+  li {
+    margin: 0.25rem 0;
 
-      a {
-        color: var(--text);
-        text-decoration: none;
-        &:hover { color: var(--accent); }
-      }
+    a {
+      color: var(--text);
+      text-decoration: none;
+      &:hover { color: var(--accent); }
+    }
 
-      .toc-num {
-        color: var(--text-muted);
-        margin-right: 0.4rem;
-        font-size: 0.8em;
-      }
-
-      &.toc-h2 { padding-left: 1rem; }
-      &.toc-h3 { padding-left: 2rem; }
+    .toc-num {
+      color: var(--text-muted);
+      margin-right: 0.4rem;
+      font-size: 0.8em;
     }
   }
+}
+
+// ---- Table of Contents ----
+
+.post-toc {
+  @extend %details-panel;
+
+  nav { margin-top: 0.5rem; }
+
+  .toc-h2 { padding-left: 1rem; }
+  .toc-h3 { padding-left: 2rem; }
 }
 
 // ---- Post article ----
@@ -148,7 +156,7 @@
 
   .heading-num {
     color: var(--text-muted);
-    margin-right: 0.4rem;
+    margin-right: 0.6rem;
   }
 
   p { margin: 1rem 0; }
@@ -162,7 +170,7 @@
   pre {
     background: var(--code-bg);
     padding: 1rem;
-    overflow-x: auto;
+    overflow: visible;
     margin: 1rem 0;
     font-size: 0.85rem;
     border: 1px solid var(--border);
@@ -171,6 +179,8 @@
     code {
       background: none;
       padding: 0;
+      display: block;
+      overflow-x: auto;
     }
   }
 
@@ -183,21 +193,16 @@
 
   ul, ol {
     margin: 1rem 0;
-    padding-left: 1.5rem;
-  }
-
-  ol {
-    list-style-position: inside;
+    padding-left: 2.5rem;
   }
 
   table {
     border-collapse: collapse;
-    margin: 1rem 0;
+    margin: 1rem auto;
 
     th, td {
       border: 1px solid var(--border);
       padding: 0.4rem 0.8rem;
-      text-align: left;
     }
 
     th { background: var(--bg-alt); }
@@ -227,7 +232,6 @@
       left: 0;
       font-size: 0.7rem;
       color: var(--accent);
-      opacity: 0.7;
 
       &::after { content: "."; }
     }
@@ -264,10 +268,30 @@
         display: inline;
       }
     }
+
+    .citation-sidenote {
+      float: right;
+      clear: right;
+      width: 220px;
+      margin-right: -250px;
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+      font-size: 0.75rem;
+      border-left: 1px solid var(--border);
+      padding-left: 0.75rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+
+      .cite-label {
+        color: var(--accent);
+        font-weight: bold;
+        font-size: 0.7rem;
+      }
+    }
   }
 }
 
-// ---- Footnotes section (mobile) ----
+// ---- Footnotes section (bottom listing) ----
 
 .footnotes-section {
   border-top: 1px solid var(--border);
@@ -275,17 +299,16 @@
   padding-top: 1rem;
 
   h2 {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--text-muted);
-    letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.4rem;
   }
 
   .footnote-definition {
     margin: 0.5rem 0;
     padding-left: 1.5rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
+    font-size: 0.9rem;
+    color: var(--text);
     position: relative;
 
     .footnote-definition-label {
@@ -293,10 +316,11 @@
       left: 0;
       font-size: 0.7rem;
       color: var(--accent);
-      opacity: 0.7;
 
       &::after { content: "."; }
     }
+
+    p { margin: 0.25rem 0; }
   }
 }
 
@@ -432,12 +456,23 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
     margin-bottom: 0.4rem;
   }
 
-  ul { list-style: none; padding: 0; }
+  ul, ol { list-style: none; padding: 0; }
   li {
     margin: 0.25rem 0;
     font-size: 0.9rem;
     overflow-wrap: break-word;
     word-break: break-all;
+  }
+
+  .citation-list li {
+    margin: 0.5rem 0;
+    line-height: 1.5;
+  }
+
+  .cite-label {
+    color: var(--accent);
+    font-weight: bold;
+    font-size: 0.85rem;
   }
 
   .ref-backlinks {
@@ -453,41 +488,17 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
   }
 }
 
+// collapse double border when footnotes precede references
+.footnotes-section + .post-references {
+  border-top: none;
+  margin-top: 1rem;
+  padding-top: 0;
+}
+
 // ---- Series navigation ----
 
 .series-nav {
-  border: 1px solid var(--border);
-  padding: 0.75rem 1rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.85rem;
-
-  summary {
-    cursor: pointer;
-    color: var(--text);
-  }
-
-  .series-toc {
-    list-style: none;
-    margin: 0.5rem 0;
-    padding-left: 0;
-    font-size: 0.85rem;
-
-    li {
-      margin: 0.25rem 0;
-
-      a {
-        color: var(--text);
-        text-decoration: none;
-        &:hover { color: var(--accent); }
-      }
-
-      .toc-num {
-        color: var(--text-muted);
-        margin-right: 0.4rem;
-        font-size: 0.8em;
-      }
-    }
-  }
+  @extend %details-panel;
 
   .series-prev-next {
     display: flex;
@@ -585,7 +596,7 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
   border: 1px solid var(--border);
   width: 90%;
   max-width: 500px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 // ---- Search highlights ----
@@ -642,7 +653,7 @@ mark.post-search-highlight {
 .global-search-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay);
   z-index: 1100;
   display: flex;
   justify-content: center;
@@ -709,4 +720,12 @@ mark.post-search-highlight {
   margin-top: 2rem;
   border-top: 1px solid var(--border);
   padding-top: 1.5rem;
+}
+
+// collapse double border when giscus follows another bordered section
+.footnotes-section + .giscus-container,
+.post-references + .giscus-container {
+  border-top: none;
+  margin-top: 1rem;
+  padding-top: 0;
 }

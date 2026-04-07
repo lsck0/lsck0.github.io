@@ -1,45 +1,134 @@
 ---
 title: Hello, World
-description: A first post demonstrating every content feature — LaTeX, TikZ, Mermaid, code, tables, footnotes, and more.
+description: A living showcase of every content feature this wiki supports.
 tags: meta, math, cs
 project: lsck0.github.io
 sources: https://commonmark.org/help/, https://katex.org/docs/supported.html
 toc: true
 ---
 
-Welcome to the blog. This post is a living showcase of everything the markdown engine supports. If you're writing a post and can't remember the syntax for something, this is the reference.
+Welcome to the blog. This post is a living reference for every feature the markdown engine supports. If you are writing a post and cannot remember the syntax for something, look here.
 
 ## Inline formatting
 
 Regular text, **bold**, _italic_, **_bold italic_**, ~~strikethrough~~, and `inline code`. Links look like [this](/about) and external links like [Rust](https://www.rust-lang.org/).
 
+### Text styles
+
+The basic text styles cover most needs: **bold** for emphasis, _italic_ for titles or foreign words, and `code` for technical terms.
+
+```definition Emphasis {#def:emphasis}
+**Emphasis** in writing is the use of typographic variation to draw attention to particular words or phrases.
+```
+
+### Links and references
+
+Links can be [internal](/about) or [external](https://www.rust-lang.org/). External links get a small icon to indicate they leave the site.
+
+```remark
+Internal links are resolved at build time; broken links will cause a warning.
+```
+
 ## Mathematics
 
-Inline math: Euler's identity $e^{i\pi} + 1 = 0$ sits beautifully in a sentence. The gamma function $\Gamma(n) = (n-1)!$ for positive integers, or more generally:
+Inline math: Euler's identity $e^{i\pi} + 1 = 0$ sits in a sentence. The gamma function $\Gamma(n) = (n-1)!$ for positive integers, or more generally:
 
 $$\Gamma(z) = \int_0^{\infty} t^{z-1} e^{-t}\, dt$$
 
-The Basel problem[^1]:
-
-$$\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}$$
+### Display equations
 
 A matrix equation:
 
 $$\begin{pmatrix} a & b \\ c & d \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix} = \begin{pmatrix} ax + by \\ cx + dy \end{pmatrix}$$
 
-[^1]: First posed by Pietro Mengoli in 1650, solved by Euler in 1734. The result connects number theory to analysis in a surprising way.
+```definition Matrix multiplication {#def:matrix-mult}
+Given matrices $A \in \mathbb{R}^{m \times n}$ and $B \in \mathbb{R}^{n \times p}$, their product $AB \in \mathbb{R}^{m \times p}$ has entries $(AB)_{ij} = \sum_{k=1}^{n} A_{ik} B_{kj}$.
+```
+
+### Multi-line math
+
+Multi-line display math with `align`:
+
+\begin{align}
+\nabla \cdot \mathbf{E} &= \frac{\rho}{\varepsilon_0} \\
+\nabla \cdot \mathbf{B} &= 0 \\
+\nabla \times \mathbf{E} &= -\frac{\partial \mathbf{B}}{\partial t} \\
+\nabla \times \mathbf{B} &= \mu_0 \mathbf{J} + \mu_0 \varepsilon_0 \frac{\partial \mathbf{E}}{\partial t}
+\end{align}
+
+```theorem Maxwell's equations {#thm:maxwell}
+The four equations above completely describe classical electromagnetism. Together with the Lorentz force law, they form the foundation of classical electrodynamics.
+```
+
+## Labeled blocks
+
+Labeled blocks are the core of the wiki system. Definitions, theorems, lemmas, and proofs are first-class citizens with automatic numbering, cross-referencing, and hover previews.
+
+```definition Metric Space {#def:metric-space}
+A **metric space** is a pair $(X, d)$ where $X$ is a set and $d \colon X \times X \to \mathbb{R}$ is a function satisfying for all $x, y, z \in X$:
+
+1. $d(x, y) \geq 0$ with equality iff $x = y$ (positive definiteness)
+2. $d(x, y) = d(y, x)$ (symmetry)
+3. $d(x, y) \leq d(x, z) + d(z, y)$ (triangle inequality)
+```
+
+```example Euclidean metric {#ex:euclidean}
+The standard metric on $\mathbb{R}^n$ is
+
+$$d(x, y) = \sqrt{\sum_{i=1}^{n} (x_i - y_i)^2}$$
+
+which makes $(\mathbb{R}^n, d)$ a complete metric space.
+```
+
+```theorem Banach fixed-point {#thm:banach}
+Let $(X, d)$ be a complete [[def:metric-space]] and $f \colon X \to X$ a contraction, i.e., there exists $0 \leq q < 1$ such that $d(f(x), f(y)) \leq q \cdot d(x, y)$ for all $x, y \in X$. Then $f$ has a unique fixed point $x^* \in X$, and for any $x_0 \in X$ the sequence $x_{n+1} = f(x_n)$ converges to $x^*$.
+```
+
+````proof
+Let $x_0 \in X$ be arbitrary and define $x_{n+1} = f(x_n)$. By the contraction property,
+
+$$d(x_{n+1}, x_n) \leq q^n \cdot d(x_1, x_0)$$
+
+The sequence $(x_n)$ is Cauchy since for $m > n$:
+
+$$d(x_m, x_n) \leq \frac{q^n}{1 - q} d(x_1, x_0) \to 0$$
+
+Since $X$ is complete, $(x_n)$ converges to some $x^* \in X$. By continuity of $f$ we have $f(x^*) = x^*$. Uniqueness follows from the contraction: if $f(y^*) = y^*$, then $d(x^*, y^*) = d(f(x^*), f(y^*)) \leq q \cdot d(x^*, y^*)$, forcing $d(x^*, y^*) = 0$.
+````
+
+```remark
+[[thm:banach]] is constructive: it not only proves existence but gives an explicit algorithm. The convergence rate is geometric with ratio $q$, so fewer iterations are needed when $q$ is small. See [@hatcher] for the topological context.
+```
+
+## Cross-references
+
+Reference labeled blocks with `[[label]]`. For example, [[def:metric-space]] and [[thm:banach]] above. Cross-post references work too: see [[def:group]] in the group theory article or [[cs/lambda-calculus#def:lambda-term]] from the lambda calculus post.
+
+## Citations
+
+Cite entries from `references.bib` with `[@key]` or `[@key, locator]`:
+
+The standard reference for abstract algebra is [@lang_algebra]. For a more concrete introduction, see [@dummit_foote, Chapter 1]. The categorical perspective is developed in [@category_theory, Chapter IV].
 
 ## Footnotes
 
-Footnotes[^2] render at the bottom on mobile and float into the right margin as sidenotes on wide screens[^3].
+Footnotes[^1] render at the bottom on mobile and float into the right margin as sidenotes on wide screens[^2].
 
-[^2]: This is a footnote. On desktop (≥1200px), it floats to the side.
+[^1]: First posed by Pietro Mengoli in 1650, solved by Euler in 1734. The result connects number theory to analysis in a surprising way.
 
-[^3]: Multiple footnotes work independently. Each gets its own margin slot.
+[^2]: Multiple footnotes work independently. Each gets its own margin slot.
+
+## Named equations
+
+```equation Euler's identity {#eq:euler}
+e^{i\pi} + 1 = 0
+```
+
+Reference it: [[eq:euler]] connects the five most important constants in mathematics.
 
 ## Code blocks
 
-Fenced code blocks get syntax highlighting via Prism. Here's Rust:
+Fenced code blocks get syntax highlighting via Prism:
 
 ```rust
 fn fibonacci(n: u64) -> u64 {
@@ -49,15 +138,7 @@ fn fibonacci(n: u64) -> u64 {
         _ => fibonacci(n - 1) + fibonacci(n - 2),
     }
 }
-
-fn main() {
-    for i in 0..10 {
-        println!("fib({i}) = {}", fibonacci(i));
-    }
-}
 ```
-
-Other languages work too:
 
 ```python
 def sieve(n: int) -> list[int]:
@@ -78,12 +159,6 @@ fibs :: [Integer]
 fibs = fix (\fbs -> 0 : 1 : zipWith (+) fbs (tail fbs))
 ```
 
-And raw LaTeX for when you need the source:
-
-```latex
-\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
-```
-
 ## Tables
 
 | Algorithm   | Best          | Average       | Worst         | Space       |
@@ -97,12 +172,6 @@ And raw LaTeX for when you need the source:
 > The purpose of abstraction is not to be vague, but to create a new semantic level in which one can be absolutely precise.
 >
 > — Edsger W. Dijkstra
-
-Nested:
-
-> First level
->
-> > Second level — blockquotes nest.
 
 ## Lists
 
@@ -120,7 +189,7 @@ Ordered:
 2. Second
 3. Third
 
-## TikZ diagram
+## TikZ diagrams
 
 A parabola on coordinate axes:
 
@@ -135,7 +204,7 @@ A parabola on coordinate axes:
 \end{tikzpicture}
 ```
 
-## Commutative diagram
+## Commutative diagrams
 
 A pullback square:
 
@@ -146,7 +215,7 @@ A pullback square:
 \end{tikzcd}
 ```
 
-## Mermaid diagram
+## Mermaid diagrams
 
 A build pipeline:
 
@@ -160,158 +229,34 @@ graph LR
     F -->|writes| A
 ```
 
-A sequence diagram:
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant B as Browser
-    participant W as WASM
-    U->>B: navigate to /blog/hello-world
-    B->>W: route match
-    W->>W: markdown_to_html()
-    W->>B: render DOM
-    B->>B: renderPost() — Prism, KaTeX, TikZ, Mermaid
-    B->>U: styled page
-```
-
-## Cross-references and backlinks
-
-You can link to other posts. For example, the [Lambda Calculus](/blog/cs/lambda-calculus) post covers Church encodings, and [Groups, Briefly](/blog/math/group-theory) introduces algebraic structures. Those posts will automatically show a "Referenced by" section pointing back here.
-
-The [sorting algorithms](/blog/cs/sorting-algorithms) post has a good table example too.
-
-## Images
-
-Images use standard markdown syntax and are constrained to `max-width: 100%`:
-
-![alt text goes here](https://placehold.co/600x200/080c12/ffffff?text=placeholder)
-
-### Local images
-
-Place images in the `public/images/` folder:
-
-```markdown
-![my image](/images/cat.jpg)
-```
-
-![local image](/images/cat.jpg)
-
-### Videos
-
-Place videos in `public/video/`:
-
-```markdown
-<video controls>
-  <source src="/video/cat.mp4" type="video/mp4">
-</video>
-```
-
-<video controls width="400">
-  <source src="/video/cat.mp4" type="video/mp4">
-</video>
-
-### Audio
-
-Place audio in `public/audio/`:
-
-```markdown
-<audio controls src="/audio/cat.mp3"></audio>
-```
-
-<audio controls src="/audio/cat.mp3"></audio>
-
-### PDFs and downloads
-
-Place files in `public/pdf/` or `public/files/`:
-
-```markdown
-<a href="/pdf/cohmology_weights.pdf" class="download-link" download>
-  <span class="download-icon">📄</span>
-  <span class="download-filename">cohmology_weights.pdf</span>
-  <span class="download-arrow">↓</span>
-</a>
-```
-
-<a href="/pdf/cohmology_weights.pdf" class="download-link" download>
-  <span class="download-icon">📄</span>
-  <span class="download-filename">cohmology_weights.pdf</span>
-  <span class="download-arrow">↓</span>
-</a>
-
-<a href="/files/header.sty" class="download-link" download>
-  <span class="download-icon">📐</span>
-  <span class="download-filename">header.sty</span>
-  <span class="download-arrow">↓</span>
-</a>
-
-### PDF embedding
-
-Use `<embed>` to show PDFs inline:
-
-```html
-<embed src="/pdf/cohmology_weights.pdf" type="application/pdf" width="100%" height="500px" />
-```
-
-<embed src="/pdf/cohmology_weights.pdf" type="application/pdf" width="100%" height="500px" />
-
-### YouTube embeds
-
-Use an iframe with the YouTube embed URL:
-
-```html
-<iframe width="560" height="315" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allowfullscreen></iframe>
-```
-
-<iframe width="560" height="315" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allowfullscreen></iframe>
-
 ## Callouts
 
-Callout blocks for extra information, warnings, and tips:
-
 ```info
-This is an informational callout (blue). Use it for supplementary details.
+This is an informational callout. Use it for supplementary details.
 ```
 
 ```warning
-This is a warning callout (red). Use it for things to watch out for.
+This is a warning callout. Use it for things to watch out for.
 ```
 
 ```tip
-This is a tip callout (green). Use it for helpful advice.
+This is a tip callout. Use it for helpful advice.
 ```
 
-## Horizontal rules
+## Internal links
 
-Three dashes create a separator:
+You can link to other posts. For example, the [Lambda Calculus](/blog/cs/lambda-calculus) post covers Church encodings, and [Groups](/blog/math/group-theory) introduces algebraic structures. Those posts will automatically show a "Referenced by" section pointing back here.
 
----
-
-## Fuzzy search
-
-Try searching for this post on the [blog page](/blog). The search is fuzzy — typing "hlw" or "wrld" will still match "Hello, World". Title matches are weighted 3× higher than body matches.
-
-## Sources
-
-The `sources` frontmatter field lists URLs that informed a post but aren't directly linked in the body. They appear in a dedicated "Sources" section at the bottom, separate from inline references. This post lists CommonMark and KaTeX docs as sources.
-
-## What's not shown here
+## What's not shown inline
 
 A few features are structural rather than per-post:
 
-- **Series navigation** — add `series` and `series_order` to frontmatter to group posts into an ordered series with prev/next links (see the [PLT series](/blog/cs/lambda-calculus) for an example)
+- **Series navigation** — add `series` and `series_order` to frontmatter to group posts into an ordered series with prev/next links (see the [PLT series](/blog/cs/lambda-calculus))
 - **Reading progress bar** — the thin accent-colored bar at the top of this page tracks your scroll position
-- **ASCII 404 page** — navigate to a [nonexistent page](/blog/does-not-exist) to see it
 - **Tag filtering** — click any tag on the [blog listing](/blog) to cycle through include/exclude states
-- **Reference backlinks** — each reference at the bottom has ↑ markers that scroll you to where the link appears in the body
+- **Reference backlinks** — each reference at the bottom has markers that scroll you to where the link appears
 - **Draft support** — add `draft: true` to frontmatter to exclude a post from the site
+- **Pinned blocks** — hover any labeled block to see a pin button; pinned blocks appear in a floating panel for study
 - **OG meta tags** — the indexer generates per-post HTML with OpenGraph tags for social embeds
 - **RSS/Atom feeds** — available at `/rss.xml` and `/atom.xml`
-
-## Smart Embedding Test
-
-Testing smart embedding with a video link: [Test Video](/video/cat.mp4)
-
-Testing smart embedding with an audio link: [Test Audio](/audio/cat.mp3)
-
-Testing smart embedding with a PDF link: [Test PDF](/pdf/cohmology_weights.pdf)
+- **404 page** — navigate to a [nonexistent page](/blog/does-not-exist) to see it

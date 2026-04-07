@@ -54,7 +54,7 @@ Dates are derived from git history at build time — no manual `date` field need
 | `publication`  | Links this post to a publication entry                     |
 | `sources`      | Comma-separated URLs for references not linked in the body |
 | `draft`        | Set to `true` to show only in dev mode with DRAFT banner   |
-| `toc`          | Set to `true` to show a collapsible table of contents      |
+| `toc`          | Set to `true` to enable section numbering + collapsible TOC |
 
 ### Content features
 
@@ -119,7 +119,8 @@ By counting cosets...
 ````
 
 Supported numbered kinds: `definition`, `theorem`, `lemma`, `corollary`,
-`proposition`, `example`, `axiom`, `remark`, `conjecture`, `exercise`, `problem`.
+`proposition`, `example`, `axiom`, `remark`, `conjecture`, `exercise`, `problem`,
+`figure`.
 
 Unnumbered: `proof` (with QED symbol).
 
@@ -154,34 +155,283 @@ Proof here.
 ````
 `````
 
-#### Cross-references
+#### Referencing and citations
 
-Reference labeled blocks from any post using `[[label]]`:
+There are several distinct mechanisms for referencing other content. Each serves
+a different purpose and renders differently.
+
+##### Quick comparison
+
+| Syntax | What it references | Renders as | Hover preview |
+| --- | --- | --- | --- |
+| `[[def:group]]` | Labeled block (same post) | "Definition 1" | Block content with math |
+| `[[thm:lagrange\|Lagrange]]` | Labeled block (custom text) | "Lagrange" | Block content with math |
+| `[[math/group-theory#def:group]]` | Labeled block (other post) | "Definition 1" | Block content with math |
+| `[[eq:first-iso]]` | Numbered equation | "(1)" | Equation content |
+| `[[fig:phase-diagram]]` | Numbered figure | "Figure 1" | Figure content |
+| `[@lang_algebra]` | BibTeX entry | "[1]" | None (scrolls to bibliography) |
+| `[@key1; @key2]` | Multiple BibTeX entries | "[1, 2]" | None |
+| `[^1]` | Footnote | Superscript "1" | None (sidenote on desktop) |
+| `[text](/blog/slug)` | Another post | "text" | Post title, description, tags |
+| `[text](https://...)` | External URL | "text" | Favicon, domain, OG metadata |
+| `![[slug]]` | Another post (embed) | Full post body inline | N/A |
+
+##### Cross-references (`[[label]]`)
+
+Reference any labeled block — definitions, theorems, equations, figures — by its
+label. The display text is generated automatically from the block kind and number.
+
+````
+```definition Group {#def:group}
+A **group** $(G, \cdot)$ is a set $G$ together with a binary operation...
+```
+
+```theorem Lagrange's Theorem {#thm:lagrange}
+If $G$ is a finite group and $H \leq G$, then $|H|$ divides $|G|$.
+```
+
+By [[def:group]], a group must satisfy three axioms.
+This follows from [[thm:lagrange]].
+````
+
+**Renders as:** "By Definition 1, a group must satisfy three axioms. This follows
+from Theorem 2."
+
+Each reference becomes a link that scrolls to the block. Hovering shows a tooltip
+with the full block content (math rendered via KaTeX).
+
+**Custom display text:** Override the auto-generated text with a pipe:
 
 ```
-By [[def-group]], we know that...
-See [[thm-lagrange]] for details.
+See [[def:group|the definition of a group]] for details.
 ```
 
-Cross-post references with explicit slug: `[[math/group-theory#def-group]]`.
-
-Cross-references render as links with hover previews showing the block content
-(with KaTeX math rendering in the tooltip). Custom display text:
-`[[def-group|the definition]]`.
-
-#### Footnotes
-
-Standard markdown footnotes:
+**Cross-post references:** Prefix with the slug to reference blocks in other posts:
 
 ```
-Some text[^1] with a footnote.
-
-[^1]: The footnote content.
+As shown in [[math/group-theory#def:group]], ...
 ```
 
-On wide screens (≥1201px), footnotes float into the right margin as sidenotes.
-On mobile devices, footnotes are grouped in a "Footnotes" section before the
-references and sources sections.
+**Auto-generated display text by kind:**
+
+| Block kind | Display text |
+| --- | --- |
+| `definition`, `theorem`, `lemma`, ... | "Definition 1", "Theorem 2", etc. |
+| `equation` | "(1)" |
+| `figure` | "Figure 1" |
+| `proof` | "Proof" |
+
+##### Auto-linking
+
+Definition titles automatically become links when they appear in prose text
+within the same post. No special syntax required.
+
+````
+```definition Subgroup {#def:subgroup}
+A subset $H \subseteq G$ is a **subgroup** of $G$ if...
+```
+
+Every group has at least two subgroups: the trivial subgroup and $G$ itself.
+````
+
+The word "subgroups" in the prose automatically links to `#def:subgroup` with a
+hover preview, even without writing `[[def:subgroup]]`.
+
+**Aliases:** Definitions can declare multiple names that all auto-link:
+
+````
+```definition Characteristic | char {#def:characteristic}
+The characteristic of a field is the smallest positive $n$ with $n \cdot 1 = 0$,
+or $0$ if no such $n$ exists.
+```
+
+A field of char $0$ is always infinite. The characteristic determines...
+````
+
+Both "characteristic" and "char" auto-link to the same definition.
+
+##### Numbered equations
+
+Label display math with `{#eq:label}` to assign a number and register it for
+cross-referencing. The label goes on the line immediately after the closing `$$`:
+
+```
+$$G / \ker(\varphi) \cong \text{im}(\varphi)$$
+{#eq:first-iso}
+```
+
+**Renders as:** The equation with an auto-injected `\tag{1}` on the right.
+
+Reference it anywhere with `[[eq:first-iso]]`, which renders as "(1)".
+
+The label can also be on the same line as a single-line equation:
+
+```
+$$E = mc^2$$ {#eq:mass-energy}
+```
+
+Equations are numbered independently from other labeled blocks (their own counter).
+
+##### Numbered figures
+
+Figures use the `figure` labeled block and get their own independent counter:
+
+````
+```figure Cayley graph of $S_3$ {#fig:cayley-s3}
+![Cayley graph](/images/cayley-s3.png)
+```
+````
+
+**Renders as:** An HTML `<figure>` with a `<figcaption>` reading "Figure 1.
+Cayley graph of S_3". The content (image, diagram, etc.) appears centered above
+the caption.
+
+Reference with `[[fig:cayley-s3]]`, which renders as "Figure 1".
+
+Figures can contain any content — images, TikZ/Mermaid diagrams, tables:
+
+````
+```figure Subgroup lattice of $S_3$ {#fig:lattice}
+```mermaid
+graph TD
+    S3["S₃"] --> A3["A₃"]
+    S3 --> H1["⟨(12)⟩"]
+    S3 --> H2["⟨(13)⟩"]
+    S3 --> H3["⟨(23)⟩"]
+    A3 --> E["{e}"]
+    H1 --> E
+    H2 --> E
+    H3 --> E
+```
+```
+````
+
+##### BibTeX citations (`[@key]`)
+
+Cite entries from the global bibliography file `content/references.bib`. This is
+for referencing published works (books, papers, articles), not for internal
+cross-references.
+
+```
+The foundational treatment follows Lang [@lang_algebra].
+```
+
+**Renders as:** "The foundational treatment follows Lang [1]." where [1] is a
+link that scrolls to the bibliography section at the bottom of the post.
+
+**Multiple citations** in a single bracket:
+
+```
+See [@lang_algebra; @dummit_foote; @aluffi] for comprehensive treatments.
+```
+
+**Renders as:** "See [1, 2, 3] for comprehensive treatments."
+
+**Bibliography section:** A numbered bibliography is automatically appended to
+any post that uses citations. Entries are formatted as:
+
+> 1. S. Lang. *Algebra*. Springer, 2002.
+> 2. D. S. Dummit, R. M. Foote. *Abstract Algebra*. John Wiley & Sons, 2004.
+
+Only cited entries appear — the full `.bib` file can contain many entries without
+bloating individual posts.
+
+**Unknown keys** render as `[?key]` with a `cite-broken` CSS class to make them
+visually obvious.
+
+The `.bib` file uses standard BibTeX format:
+
+```bibtex
+@book{lang_algebra,
+    author = {Lang, Serge},
+    title = {Algebra},
+    edition = {3rd},
+    publisher = {Springer},
+    year = {2002},
+}
+```
+
+Supported entry types: `@book`, `@article`, `@misc`, `@inproceedings`. Comments
+start with `//`.
+
+##### Footnotes
+
+Side notes for tangential commentary. Not for citations — use BibTeX for that.
+
+```
+The symmetric group $S_n$ plays a central role in algebra.[^1]
+
+[^1]: Cayley's theorem states that every finite group embeds into some $S_n$.
+```
+
+On wide screens (>=1201px), footnotes float into the right margin as sidenotes
+next to the paragraph that references them. On mobile, they are collected into a
+"Footnotes" section before the bibliography and references.
+
+##### Links to other posts
+
+Standard markdown links to `/blog/{slug}` create navigable internal links with
+hover previews and automatic back-reference tracking:
+
+```
+See [the post on lambda calculus](/blog/cs/lambda-calculus) for background.
+```
+
+**Hover preview:** Shows the post's title, description, tags, and series info.
+
+**Back-references:** The linked post's reference section will show this post
+under "Referenced internally by" with backlink markers (^1, ^2, ...) that scroll
+to where the link appears.
+
+##### External links
+
+Standard markdown links to URLs. Hover previews show the favicon, domain, URL
+path, and pre-fetched OG metadata (title, description, image) when available:
+
+```
+See the [nLab article on groups](https://ncatlab.org/nlab/show/group).
+```
+
+External links in post content open in a new tab. URLs are also collected in the
+post's "External references" section with backlink markers.
+
+##### Sources (frontmatter)
+
+URLs in the `sources` frontmatter field appear in a dedicated "Sources" section
+on the post page. Use this for references that aren't cited inline:
+
+```yaml
+sources: https://en.wikipedia.org/wiki/Group_(mathematics), https://ncatlab.org/nlab/show/group
+```
+
+These are separate from BibTeX citations — use `sources` for web references you
+want to list without inline `[@key]` citations.
+
+##### Transclusion
+
+Embed the full body of another post inline at build time:
+
+```
+![[cs/lambda-calculus]]
+```
+
+The referenced post's entire rendered body replaces this line. Useful for
+including prerequisite material or shared definitions without duplicating content.
+
+##### When to use what
+
+| Situation | Use |
+| --- | --- |
+| Refer to a definition/theorem in the same post | `[[label]]` or auto-linking |
+| Refer to a definition/theorem in another post | `[[slug#label]]` |
+| Refer to a numbered equation | `[[eq:label]]` |
+| Refer to a numbered figure | `[[fig:label]]` |
+| Cite a published book/paper | `[@bib_key]` |
+| Add a tangential remark | `[^N]` footnote |
+| Link to another post for context | `[text](/blog/slug)` |
+| Link to an external resource inline | `[text](https://...)` |
+| List reference URLs without inline citation | `sources:` frontmatter |
+| Include another post's content verbatim | `![[slug]]` |
 
 #### Callouts / Admonitions
 
@@ -207,35 +457,6 @@ Or blockquote syntax:
 Supported types: `tip` (green), `warning` (red), `danger` (red),
 `note` (accent), `info` (blue).
 
-#### Transclusion
-
-Embed the body of another post inline using `![[slug]]`:
-
-```
-![[cs/lambda-calculus]]
-```
-
-The referenced post's body is inserted at build time.
-
-#### Internal references
-
-Link to other posts using `/blog/{slug}`. The post page automatically shows:
-
-- **Internal references** — posts this post links to, with backlink markers
-- **External references** — external URLs linked in the body
-- **Sources** — URLs listed in the `sources` frontmatter field
-- **Referenced internally by** — other posts that link to this post (including
-  cross-references)
-
-Each reference includes backlink markers (↑1, ↑2, ...) that scroll to where
-the link appears in the body. Backlinks work for both standard links and
-cross-references.
-
-#### Link behavior
-
-All links within post content open in a new tab. Navigation links (header,
-sidebar, footer) stay in the same tab.
-
 #### Link hover previews
 
 All links in posts and listing pages show a tooltip on hover that persists while
@@ -243,14 +464,13 @@ the cursor is on the link or the tooltip itself. Tooltips support nested hoverin
 definitions within a hover can themselves be hovered to show stacked tooltips
 (up to 4 levels deep).
 
-- **Internal links**: show title, description, tags, and series info
-- **Cross-references**: show the block content with rendered math (including align,
-  gather, and equation environments)
-- **External links**: show favicon, domain, URL path, and pre-fetched OG metadata
-  (title, description, image) when available
-- **Site links**: show the link text and path
-- **Related posts** (in projects/publications): show post preview with title,
-  description, tags, and series info
+| Link type | Preview content |
+| --- | --- |
+| Cross-references (`[[label]]`) | Full block content with rendered KaTeX math |
+| Internal post links (`/blog/slug`) | Title, description, tags, series info |
+| External links (`https://...`) | Favicon, domain, URL path, OG metadata (title, description, image) |
+| Site links (`/about`, `/projects`) | Link text and path |
+| Related posts (in projects/publications) | Post title, description, tags, series |
 
 #### Series navigation
 
@@ -280,7 +500,7 @@ copies of their source code, making them findable via browser Ctrl+F search.
 - **Bookmark button** — SVG bookmark icon before the title
 - **Reading progress bar** — thin accent bar at viewport top
 - **In-post search** — Ctrl+F to search within the post content, with match highlighting and prev/next navigation
-- **Table of contents** — collapsible, auto-generated from h1/h2/h3 headings (opt-in via `toc: true`)
+- **Table of contents** — collapsible, auto-generated from h1/h2/h3 headings (opt-in via `toc: true`). When enabled, headings get section numbers (1, 1.1, 2, etc.) and labeled blocks get section-scoped numbers (Definition 1.1 instead of Definition 1). When disabled, labeled blocks use a global counter (1, 2, 3, ...)
 - **Draft banner** — yellow "DRAFT" banner for draft posts (dev mode only)
 - **Scroll-to-top** — appears after scrolling past 50% viewport height
 - **Giscus comments** — powered by GitHub Discussions
@@ -291,9 +511,12 @@ copies of their source code, making them findable via browser Ctrl+F search.
   math, cross-reference tooltips, and source links. Items in the panel are
   hoverable for nested definition previews. When open on wide screens, main
   content reflows left to avoid overlap (sidenote footnotes become inline).
-- **Study mode** — "study" button in pinned panel header activates Anki-style
-  flashcards: shows the block kind/title as the front, click "reveal" to show
-  the content, then navigate prev/next through all pinned blocks
+- **Study mode** — "study" button in pinned panel header opens an Anki-style
+  flashcard modal: shows the block kind/title as the front, click "reveal" to
+  show the content, then rate with three buttons: "didn't know" (re-inserts
+  card 2× near front of deck), "unsure" (re-inserts in middle), or "knew it"
+  (pushes to back; second consecutive "knew it" removes the card). Session ends
+  when the deck is empty. Scores persist across sessions via localStorage
 - **Mobile pins** — on small screens, a floating button shows the pin count;
   tapping it opens the pinned panel as a fullscreen overlay
 
@@ -375,20 +598,31 @@ localStorage access patterns.
 | `read:{slug}`     | timestamp            | Post has been viewed                     |
 | `theme`           | `"dark"` / `"light"` | Current theme                            |
 | `pinned-blocks`   | JSON array           | Pinned labeled blocks with preview HTML  |
+| `study-scores`    | JSON object          | Per-block right/unsure/wrong counts      |
 
 ## Content Pipeline Architecture
 
 The content pipeline has three layers:
 
-1. **`crates/content/`** — Shared library for frontmatter parsing, link extraction,
-   and transclusion. Used by both the proc macro and the indexer.
+1. **`crates/ir/`** — Core library: IR types, frontmatter parsing, markdown→IR
+   parser, BibTeX parser, and cross-reference/citation resolution. Shared by the
+   proc macro, frontend renderer, and indexer. Heading and block numbering is
+   computed here (single source of truth for all numbering).
 
-2. **`crates/macros/`** — Proc macro crate that reads content at compile time,
-   extracts labeled blocks, resolves cross-references, and emits a static
-   `&[Post]` array embedded in the WASM binary.
+2. **`src/components/render.rs`** — IR→HTML renderer inlined in the frontend.
+   Converts the IR block/inline tree into HTML strings with data attributes for
+   JS post-processing (tooltips, pin buttons, math rendering). The renderer only
+   displays what the IR tells it — no re-computation of numbering or structure.
 
-3. **`crates/indexer/`** — Post-build binary that generates feeds, search index,
+3. **`crates/macros/`** — Proc macro crate that reads content at compile time,
+   parses markdown into an IR tree, resolves cross-references and citations, and
+   serializes the result as a `postcard`-encoded byte blob embedded in the WASM
+   binary. At runtime, the frontend deserializes once via `LazyLock<SiteData>`.
+
+4. **`crates/indexer/`** — Post-build binary that generates feeds, search index,
    graph data, OG pages, and sitemap from the same content source.
+
+5. **`crates/lsp/`** — LSP server for content editing (see below).
 
 ## Projects (`content/projects.toml`)
 
@@ -408,6 +642,8 @@ status = "maintained"
 | `description` | string or segment[] | Short description                                   |
 | `url`         | string (optional)   | Link (omit for no link)                             |
 | `status`      | string              | One of: `maintained`, `wip`, `planned`, `abandoned` |
+| `company`     | string (optional)   | Company name — marks project as professional        |
+| `anonymous`   | bool (optional)     | If true, shown as professional without company name |
 
 ### Text segments
 
@@ -463,6 +699,51 @@ All text fields support the same segment array syntax as projects.
 
 The site provides an OpenSearch description at `/opensearch.xml`, enabling browsers
 to add the blog's search as a search engine. The search URL points to `/blog?q={searchTerms}`.
+
+## Content LSP
+
+A language server at `crates/lsp/` provides IDE features for markdown content
+editing: autocomplete for `[[cross-references]]` and `[@citations]`, go-to-definition,
+and diagnostics for broken references.
+
+### Running the LSP
+
+```bash
+cargo run --package lsp
+```
+
+The LSP reads from the `content/` directory and indexes all post labels, BibTeX
+entries, and post slugs. Configure your editor to use it as a language server
+for `.md` files in the `content/posts/` directory.
+
+### Editor configuration
+
+**Neovim (via nvim-lspconfig):**
+
+```lua
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "markdown",
+  callback = function()
+    vim.lsp.start({
+      name = "blog-lsp",
+      cmd = { "cargo", "run", "--package", "lsp" },
+      root_dir = vim.fn.getcwd(),
+    })
+  end,
+})
+```
+
+**VS Code:** Add a `.vscode/settings.json` entry pointing to the LSP binary,
+or use a generic LSP client extension.
+
+### Features
+
+| Feature | Trigger | Description |
+| --- | --- | --- |
+| Autocomplete | `[[` | Suggests labels from all posts |
+| Autocomplete | `[@` | Suggests BibTeX keys from `references.bib` |
+| Go-to-definition | `[[label]]` | Jumps to the labeled block |
+| Diagnostics | Save | Warns about broken cross-references |
 
 ## Anti-AI Measures
 

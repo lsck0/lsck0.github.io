@@ -14,17 +14,20 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.35rem;
-  transition: border-color 0.2s ease;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  padding: 0.45rem 0.65rem;
+  background: var(--bg);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
   &:focus-within {
     border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
   }
 
   input {
     flex: 1;
-    padding: 0.3rem 0;
+    padding: 0;
     font-family: inherit;
     font-size: 0.85rem;
     border: none;
@@ -35,7 +38,7 @@
 
     &::placeholder {
       color: var(--text-muted);
-      opacity: 0.6;
+      opacity: 0.7;
     }
   }
 }
@@ -44,7 +47,7 @@
   color: var(--text-muted);
   font-size: 0.75rem;
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 .blog-views {
@@ -55,6 +58,30 @@
 }
 
 .view-toggle {
+  font-family: inherit;
+  font-size: 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.45rem;
+  opacity: 0.8;
+  transition: opacity 0.15s ease, color 0.15s ease;
+
+  &:hover { opacity: 1; color: var(--text); }
+  &.active { opacity: 1; color: var(--accent); }
+}
+
+// ---- Read filter ----
+
+.blog-read-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.25rem 0;
+}
+
+.read-filter {
   font-family: inherit;
   font-size: 0.75rem;
   background: none;
@@ -249,20 +276,12 @@
   }
 }
 
-// ---- Tree view ----
+// ---- Shared collapsible section styles (tree view + series view) ----
 
-.blog-tree-view {
-  margin-top: 0.25rem;
-}
-
-.tree-section {
-  margin-bottom: 0.25rem;
-}
-
-.tree-folder-btn {
+%section-header-btn {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   width: 100%;
   text-align: left;
   font-family: inherit;
@@ -277,30 +296,13 @@
   &:hover { color: var(--accent); }
 }
 
-.tree-icon {
-  font-size: 0.55rem;
-  color: var(--text-muted);
-  width: 0.7em;
-  flex-shrink: 0;
-}
-
-.tree-folder-name {
-  color: var(--text-muted);
-}
-
-.tree-folder-count {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  opacity: 0.6;
-}
-
-.tree-children {
+%section-children {
   padding-left: 1rem;
   border-left: 1px solid var(--border);
   margin-left: 0.3rem;
 }
 
-.tree-file {
+%section-entry {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
@@ -308,18 +310,70 @@
   font-size: 0.85rem;
 }
 
-.tree-file-link {
+%section-link {
   color: var(--text);
   text-decoration: none;
 
   &:hover { color: var(--accent); }
 }
 
-.tree-file-meta {
+.section-icon {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  width: 0.7em;
+  flex-shrink: 0;
+}
+
+.section-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.section-meta {
   color: var(--text-muted);
   font-size: 0.7rem;
   flex-shrink: 0;
   opacity: 0.6;
+}
+
+// ---- Tree view ----
+
+.blog-tree-view {
+  margin-top: 0.25rem;
+}
+
+.tree-section {
+  margin-bottom: 0.25rem;
+}
+
+.tree-folder-btn {
+  @extend %section-header-btn;
+}
+
+
+.tree-folder-name {
+  color: var(--text-muted);
+}
+
+.tree-folder-count {
+  @extend .section-count;
+}
+
+.tree-children {
+  @extend %section-children;
+}
+
+.tree-file {
+  @extend %section-entry;
+}
+
+.tree-file-link {
+  @extend %section-link;
+}
+
+.tree-file-meta {
+  @extend .section-meta;
 }
 
 // ---- Series view ----
@@ -333,22 +387,7 @@
 }
 
 .series-header-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  text-align: left;
-  font-family: inherit;
-  font-size: 0.85rem;
-  padding: 0.5rem 0;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  cursor: pointer;
-
-  &:hover { color: var(--accent); }
-  &.standalone { cursor: default; }
+  @extend %section-header-btn;
 }
 
 .series-name {
@@ -356,23 +395,15 @@
 }
 
 .series-progress {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  opacity: 0.6;
+  @extend .section-count;
 }
 
 .series-entries {
-  padding-left: 1rem;
-  border-left: 1px solid var(--border);
-  margin-left: 0.3rem;
+  @extend %section-children;
 }
 
 .series-entry {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  padding: 0.3rem 0;
-  font-size: 0.85rem;
+  @extend %section-entry;
 }
 
 .series-num {
@@ -383,10 +414,7 @@
 }
 
 .series-link {
-  color: var(--text);
-  text-decoration: none;
-
-  &:hover { color: var(--accent); }
+  @extend %section-link;
 }
 
 // ---- Graph view ----

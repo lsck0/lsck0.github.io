@@ -1,344 +1,556 @@
+#![allow(clippy::needless_return)]
+
+//! IR → HTML rendering and JS post-processing trigger.
+//!
+//! Converts the IR block/inline tree into HTML strings with data attributes
+//! for JS post-processing (KaTeX, TikZ, Mermaid, Prism, tooltips, pin buttons).
+
 use std::collections::HashMap;
 
+pub use ir::capitalize;
+use ir::types::*;
 use leptos::prelude::*;
-use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd, html};
 
-use crate::models::post::POSTS;
+use crate::models::post::{POSTS, Post};
 
 // ============================================================
 // Public API
 // ============================================================
 
 /// Calls the JS `renderPost()` function after the current component mounts.
-/// Used by post pages and prose pages to initialize tooltips, math, diagrams, etc.
 pub fn call_render_post() {
     Effect::new(move |_: Option<()>| {
         let _ = js_sys::eval("renderPost();");
     });
 }
 
-pub struct RenderedMarkdown {
-    pub html: String,
-    pub link_occurrences: HashMap<String, Vec<String>>,
+/// Metadata about an internal post, used for hover preview data attributes.
+pub struct PostPreview {
+    pub title: String,
+    pub description: String,
+    pub tags: String,
+    pub series: String,
 }
 
-pub fn markdown_to_html(markdown: &str) -> RenderedMarkdown {
-    let options =
-        Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_MATH | Options::ENABLE_FOOTNOTES;
-
-    let parser = Parser::new_ext(markdown, options);
-    let (events, mut link_occurrences) = process_events(parser);
-
-    let mut output = String::new();
-    html::push_html(&mut output, events.into_iter());
-    output = process_callouts(&output);
-    output = process_labeled_blocks(&output);
-
-    // Post-process to track xref links that were rendered as HTML
-    output = extract_xref_links(&output, &mut link_occurrences);
-
-    return RenderedMarkdown {
-        html: output,
-        link_occurrences,
-    };
+/// Render an IR content tree to HTML, wired to the static POSTS data
+/// for internal link hover previews.
+pub fn render_post_content(content: &[Block], _post: &Post) -> (String, HashMap<String, Vec<String>>) {
+    return render_content(content, |slug| {
+        let target = POSTS.iter().find(|p| p.slug() == slug)?;
+        Some(PostPreview {
+            title: target.title().to_string(),
+            description: target.description().to_string(),
+            tags: target.tags().join(", "),
+            series: target.series().unwrap_or("").to_string(),
+        })
+    });
 }
 
-// ============================================================
-// Special fenced code blocks
-// ============================================================
-
-enum SpecialBlock {
-    Tikz,
-    TikzCd,
-    Mermaid,
-    LabeledBlock,
-}
-
-fn special_block(language: &str) -> Option<SpecialBlock> {
-    match language {
-        "tikz" => Some(SpecialBlock::Tikz),
-        "tikzcd" => Some(SpecialBlock::TikzCd),
-        "mermaid" => Some(SpecialBlock::Mermaid),
-        "definition" | "theorem" | "lemma" | "corollary" | "proposition" | "axiom" | "remark" | "example"
-        | "conjecture" | "exercise" | "problem" | "proof" => Some(SpecialBlock::LabeledBlock),
-        _ => None,
-    }
-}
-
-impl SpecialBlock {
-    fn render(&self, content: &str) -> String {
-        let escaped = html_escape(content);
-        match self {
-            SpecialBlock::Tikz => format!("<pre class=\"tikz-src\">{escaped}</pre>"),
-            SpecialBlock::TikzCd => {
-                format!("<pre class=\"tikz-src\" data-libs=\"cd\">{escaped}</pre>")
-            }
-            SpecialBlock::Mermaid => format!("<pre class=\"mermaid\">{content}</pre>"),
-            SpecialBlock::LabeledBlock => content.to_string(),
-        }
-    }
+/// Render an IR content tree to an HTML string.
+///
+/// `post_lookup` resolves internal `/blog/{slug}` links to preview metadata.
+/// Returns `(html, link_occurrences)` where link_occurrences maps each URL
+/// to the list of anchor IDs where it appears (for backlink tracking).
+pub fn render_content(
+    content: &[Block],
+    post_lookup: impl Fn(&str) -> Option<PostPreview>,
+) -> (String, HashMap<String, Vec<String>>) {
+    let mut ctx = RenderContext::new(post_lookup);
+    let html = render_blocks(content, &mut ctx);
+    return (html, ctx.link_occurrences);
 }
 
 // ============================================================
-// Event processing state machine
+// Render context
 // ============================================================
 
-enum State {
-    Normal,
-    Code(String),
-    Special(SpecialBlock, String),
-    Image(String, String, u32),
-    MediaLink(String, String, String),
-    /// Heading(level, plain_text_for_slug, html_content)
-    Heading(u8, String, String),
+struct RenderContext<F> {
+    link_counter: u32,
+    image_counter: u32,
+    link_occurrences: HashMap<String, Vec<String>>,
+    post_lookup: F,
+    footnote_numbers: HashMap<String, u32>,
+    footnote_counter: u32,
 }
 
-fn detect_media_type(url: &str) -> Option<String> {
-    let lowercase_url = url.to_lowercase();
-    if lowercase_url.ends_with(".mp3")
-        || lowercase_url.ends_with(".wav")
-        || lowercase_url.ends_with(".ogg")
-        || lowercase_url.ends_with(".flac")
-    {
-        return Some("audio".to_string());
-    }
-    if lowercase_url.ends_with(".mp4") || lowercase_url.ends_with(".webm") || lowercase_url.ends_with(".ogv") {
-        return Some("video".to_string());
-    }
-    if lowercase_url.ends_with(".pdf") {
-        return Some("pdf".to_string());
-    }
-    return None;
-}
-
-fn process_events<'a>(parser: impl Iterator<Item = Event<'a>>) -> (Vec<Event<'a>>, HashMap<String, Vec<String>>) {
-    let mut events: Vec<Event<'a>> = Vec::new();
-    let mut state = State::Normal;
-    let mut link_counter: u32 = 0;
-    let mut image_counter: u32 = 0;
-    let mut link_occurrences: HashMap<String, Vec<String>> = HashMap::new();
-
-    for event in parser {
-        state = match state {
-            State::Special(block, mut buffer) => match event {
-                Event::Text(text) => {
-                    buffer.push_str(&text);
-                    State::Special(block, buffer)
-                }
-                Event::End(TagEnd::CodeBlock) => {
-                    events.push(Event::Html(block.render(&buffer).into()));
-                    State::Normal
-                }
-                _ => State::Special(block, buffer),
-            },
-
-            State::Heading(level, mut plain, mut html_buf) => match event {
-                Event::Text(text) => {
-                    plain.push_str(&text);
-                    html_buf.push_str(&html_escape(&text));
-                    State::Heading(level, plain, html_buf)
-                }
-                Event::InlineMath(math) => {
-                    plain.push_str(&math);
-                    let escaped = html_escape(&math);
-                    html_buf.push_str(&format!(
-                        "<span class=\"math-inline\" data-latex=\"{escaped}\">\\({escaped}\\)</span>"
-                    ));
-                    State::Heading(level, plain, html_buf)
-                }
-                Event::Code(code) => {
-                    plain.push_str(&code);
-                    html_buf.push_str(&format!("<code>{}</code>", html_escape(&code)));
-                    State::Heading(level, plain, html_buf)
-                }
-                Event::End(TagEnd::Heading(_)) => {
-                    let id = slugify(&plain);
-                    events.push(Event::Html(
-                        format!("<h{level} id=\"{id}\">{html_buf}</h{level}>").into(),
-                    ));
-                    State::Normal
-                }
-                _ => State::Heading(level, plain, html_buf),
-            },
-
-            State::Image(url, mut alt_text, id) => match event {
-                Event::Text(text) => {
-                    alt_text.push_str(&text);
-                    State::Image(url, alt_text, id)
-                }
-                Event::End(TagEnd::Image) => {
-                    let escaped_alt = html_escape(&alt_text);
-                    events.push(Event::Html(
-                        format!(
-                            "<figure id=\"img-{id}\" class=\"post-figure\"><img src=\"{url}\" alt=\"{escaped_alt}\" \
-                             loading=\"lazy\" /></figure>"
-                        )
-                        .into(),
-                    ));
-                    State::Normal
-                }
-                _ => State::Image(url, alt_text, id),
-            },
-
-            State::MediaLink(url, media_type, mut title) => match event {
-                Event::Text(text) => {
-                    title.push_str(&text);
-                    State::MediaLink(url, media_type, title)
-                }
-                Event::End(TagEnd::Link) => {
-                    let escaped_title = html_escape(&title);
-                    events.push(Event::Html(
-                        format!(
-                            "<div class=\"media-embed\" data-type=\"{media_type}\" data-src=\"{url}\" \
-                             data-title=\"{escaped_title}\"></div>"
-                        )
-                        .into(),
-                    ));
-                    State::Normal
-                }
-                _ => State::MediaLink(url, media_type, title),
-            },
-
-            State::Code(ref language) => match event {
-                Event::End(TagEnd::CodeBlock) => {
-                    events.push(Event::Html("</code></pre>".into()));
-                    State::Normal
-                }
-                Event::Text(text) => {
-                    let escaped = if language == "diff" {
-                        render_diff_code(&text)
-                    } else {
-                        html_escape(&text)
-                    };
-                    events.push(Event::Html(escaped.into()));
-                    State::Code(language.to_string())
-                }
-                _ => State::Code(language.to_string()),
-            },
-
-            State::Normal => match event {
-                Event::Start(Tag::Heading { level, .. }) => {
-                    let numeric_level = match level {
-                        HeadingLevel::H1 => 1,
-                        HeadingLevel::H2 => 2,
-                        HeadingLevel::H3 => 3,
-                        HeadingLevel::H4 => 4,
-                        HeadingLevel::H5 => 5,
-                        HeadingLevel::H6 => 6,
-                    };
-                    State::Heading(numeric_level, String::new(), String::new())
-                }
-                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language))) => {
-                    let language_string = language.to_string();
-                    if let Some(block) = special_block(&language_string) {
-                        State::Special(block, String::new())
-                    } else {
-                        let css_class = if language_string == "diff" {
-                            "language-diff".to_string()
-                        } else {
-                            format!("language-{language_string}")
-                        };
-                        events.push(Event::Html(format!("<pre><code class=\"{css_class}\">").into()));
-                        State::Code(language_string)
-                    }
-                }
-                Event::InlineMath(math) => {
-                    let escaped = html_escape(&math);
-                    events.push(Event::Html(
-                        format!("<span class=\"math-inline\" data-latex=\"{escaped}\">\\({escaped}\\)</span>").into(),
-                    ));
-                    State::Normal
-                }
-                Event::DisplayMath(math) => {
-                    let escaped = html_escape(&math);
-                    events.push(Event::Html(
-                        format!("<div class=\"math-display\" data-latex=\"{escaped}\">\\[{escaped}\\]</div>").into(),
-                    ));
-                    State::Normal
-                }
-                Event::Start(Tag::Link { dest_url, .. }) => {
-                    let url = dest_url.to_string();
-
-                    if let Some(media_type) = detect_media_type(&url) {
-                        State::MediaLink(url, media_type, String::new())
-                    } else {
-                        let is_trackable = url.starts_with("/blog/") || url.starts_with("http");
-                        if is_trackable {
-                            link_counter += 1;
-                            let anchor_id = format!("ref-{link_counter}");
-
-                            // Track by base URL (strip fragment) so all links to the same
-                            // page are grouped together in the references section.
-                            let tracking_url = url.split('#').next().unwrap_or(&url).to_string();
-                            link_occurrences
-                                .entry(tracking_url)
-                                .or_default()
-                                .push(anchor_id.clone());
-
-                            let metadata_attributes = if let Some(slug) = url.strip_prefix("/blog/") {
-                                let slug = slug.split('#').next().unwrap_or(slug);
-                                POSTS
-                                    .iter()
-                                    .find(|post| post.slug == slug)
-                                    .map(|post| {
-                                        let description = html_escape(post.description());
-                                        let tags = post.tags().join(", ");
-                                        let series = post.series().unwrap_or("");
-                                        format!(
-                                            " data-post-title=\"{}\" data-post-desc=\"{description}\" \
-                                             data-post-tags=\"{tags}\" data-post-series=\"{series}\"",
-                                            html_escape(post.title())
-                                        )
-                                    })
-                                    .unwrap_or_default()
-                            } else {
-                                String::new()
-                            };
-                            events.push(Event::Html(
-                                format!(
-                                    "<a href=\"{url}\" id=\"{anchor_id}\"{metadata_attributes} target=\"_blank\" \
-                                     rel=\"noopener\">"
-                                )
-                                .into(),
-                            ));
-                        } else {
-                            events.push(Event::Html(
-                                format!("<a href=\"{url}\" target=\"_blank\" rel=\"noopener\">").into(),
-                            ));
-                        }
-                        State::Normal
-                    }
-                }
-                Event::End(TagEnd::Link) => {
-                    events.push(Event::Html("</a>".into()));
-                    State::Normal
-                }
-                Event::Start(Tag::Image { dest_url, .. }) => {
-                    image_counter += 1;
-                    let url = dest_url.to_string();
-
-                    if url.starts_with("/blog/") || url.starts_with("http") {
-                        link_counter += 1;
-                        let anchor_id = format!("ref-{link_counter}");
-                        link_occurrences.entry(url.clone()).or_default().push(anchor_id);
-                    }
-
-                    State::Image(url, String::new(), image_counter)
-                }
-                other => {
-                    events.push(other);
-                    State::Normal
-                }
-            },
+impl<F: Fn(&str) -> Option<PostPreview>> RenderContext<F> {
+    fn new(post_lookup: F) -> Self {
+        return Self {
+            link_counter: 0,
+            image_counter: 0,
+            link_occurrences: HashMap::new(),
+            post_lookup,
+            footnote_numbers: HashMap::new(),
+            footnote_counter: 0,
         };
     }
 
-    return (events, link_occurrences);
+    fn footnote_number(&mut self, id: &str) -> u32 {
+        if let Some(&num) = self.footnote_numbers.get(id) {
+            return num;
+        }
+        self.footnote_counter += 1;
+        self.footnote_numbers.insert(id.to_string(), self.footnote_counter);
+        return self.footnote_counter;
+    }
+
+    fn next_link_id(&mut self, url: &str) -> String {
+        self.link_counter += 1;
+        let anchor_id = format!("ref-{}", self.link_counter);
+        let tracking_url = url.split('#').next().unwrap_or(url).to_string();
+        self.link_occurrences
+            .entry(tracking_url)
+            .or_default()
+            .push(anchor_id.clone());
+        return anchor_id;
+    }
+
+    fn next_image_id(&mut self) -> u32 {
+        self.image_counter += 1;
+        return self.image_counter;
+    }
+
+    fn post_metadata_attrs(&self, url: &str) -> String {
+        let Some(slug) = url.strip_prefix("/blog/") else {
+            return String::new();
+        };
+        let slug = slug.split('#').next().unwrap_or(slug);
+        let Some(preview) = (self.post_lookup)(slug) else {
+            return String::new();
+        };
+        return format!(
+            " data-post-title=\"{}\" data-post-desc=\"{}\" data-post-tags=\"{}\" data-post-series=\"{}\"",
+            html_escape(&preview.title),
+            html_escape(&preview.description),
+            preview.tags,
+            preview.series,
+        );
+    }
 }
 
 // ============================================================
-// Diff code highlighting
+// Block rendering
 // ============================================================
+
+fn render_blocks<F: Fn(&str) -> Option<PostPreview>>(blocks: &[Block], ctx: &mut RenderContext<F>) -> String {
+    let mut html = String::new();
+    for block in blocks {
+        html.push_str(&render_block(block, ctx));
+    }
+    return html;
+}
+
+fn render_block<F: Fn(&str) -> Option<PostPreview>>(block: &Block, ctx: &mut RenderContext<F>) -> String {
+    match block {
+        Block::Heading {
+            level,
+            id,
+            number,
+            children,
+        } => {
+            let inner = render_inlines(children, ctx);
+            if number.is_empty() {
+                format!("<h{level} id=\"{id}\">{inner}</h{level}>\n")
+            } else {
+                let num_span = format!("<span class=\"heading-num\">{number}</span>");
+                format!("<h{level} id=\"{id}\">{num_span}{inner}</h{level}>\n")
+            }
+        }
+
+        Block::Paragraph(children) => {
+            let inner = render_inlines(children, ctx);
+            format!("<p>{inner}</p>\n")
+        }
+
+        Block::CodeBlock { language, code } => {
+            let escaped = html_escape(code);
+            if language.is_empty() {
+                format!("<pre><code>{escaped}</code></pre>\n")
+            } else if language == "diff" {
+                format!(
+                    "<pre><code class=\"language-diff\">{}</code></pre>\n",
+                    render_diff_code(code)
+                )
+            } else {
+                format!("<pre><code class=\"language-{language}\">{escaped}</code></pre>\n")
+            }
+        }
+
+        Block::LabeledBlock {
+            kind,
+            id,
+            number,
+            title,
+            content,
+            ..
+        } => {
+            let kind_display = capitalize(kind);
+            let is_proof = kind == "proof";
+
+            let header_html = if is_proof {
+                if title.is_empty() {
+                    "<strong>Proof.</strong>".to_string()
+                } else {
+                    format!("<strong>Proof</strong> ({title})<strong>.</strong>")
+                }
+            } else if !number.is_empty() {
+                if title.is_empty() {
+                    format!("<strong>{kind_display} {number}.</strong>")
+                } else {
+                    format!("<strong>{kind_display} {number}</strong> ({title})<strong>.</strong>")
+                }
+            } else {
+                format!("<strong>{kind_display}.</strong>")
+            };
+
+            let inner = render_blocks(content, ctx);
+            let qed = if is_proof {
+                "\n<span class=\"qed\">\u{220e}</span>"
+            } else {
+                ""
+            };
+
+            format!(
+                "<div class=\"labeled-block {kind}\" id=\"{id}\"><div \
+                 class=\"labeled-block-header\">{header_html}</div><div \
+                 class=\"labeled-block-content\">{inner}</div>{qed}</div>\n"
+            )
+        }
+
+        Block::Equation {
+            id,
+            number,
+            title,
+            latex,
+            ..
+        } => {
+            let escaped = html_escape(latex);
+            let tag = if !number.is_empty() {
+                format!("\\tag{{{number}}}")
+            } else {
+                String::new()
+            };
+            let caption = if !title.is_empty() && !number.is_empty() {
+                format!(
+                    "<div class=\"labeled-block-header\"><strong>Equation {number}</strong> \
+                     ({title})<strong>.</strong></div>"
+                )
+            } else {
+                String::new()
+            };
+            format!(
+                "<div class=\"labeled-block equation\" id=\"{id}\">{caption}<div class=\"math-display\" \
+                 data-latex=\"{escaped}\">\\[{tag}{escaped}\\]</div></div>\n"
+            )
+        }
+
+        Block::Diagram {
+            variant,
+            id,
+            title,
+            source,
+            ..
+        } => {
+            let escaped = html_escape(source);
+            let inner = match variant {
+                DiagramKind::Tikz => format!("<pre class=\"tikz-src\">{escaped}</pre>"),
+                DiagramKind::TikzCd => {
+                    format!("<pre class=\"tikz-src\" data-libs=\"cd\">{escaped}</pre>")
+                }
+                DiagramKind::Mermaid => format!("<pre class=\"mermaid\">{source}</pre>"),
+            };
+            let caption = if !title.is_empty() {
+                format!("<figcaption>{title}</figcaption>")
+            } else {
+                String::new()
+            };
+            let id_attr = if !id.is_empty() {
+                format!(" id=\"{id}\"")
+            } else {
+                String::new()
+            };
+            format!("<figure class=\"diagram\"{id_attr}>{inner}{caption}</figure>\n")
+        }
+
+        Block::Figure {
+            id,
+            number,
+            title,
+            content,
+            ..
+        } => {
+            let inner = render_blocks(content, ctx);
+            let caption = if !number.is_empty() && !title.is_empty() {
+                format!("<figcaption><strong>Figure {number}.</strong> {title}</figcaption>")
+            } else if !number.is_empty() {
+                format!("<figcaption><strong>Figure {number}.</strong></figcaption>")
+            } else if !title.is_empty() {
+                format!("<figcaption>{title}</figcaption>")
+            } else {
+                String::new()
+            };
+            format!("<figure class=\"labeled-block figure\" id=\"{id}\">{inner}{caption}</figure>\n")
+        }
+
+        Block::MathDisplay(latex) => {
+            let escaped = html_escape(latex);
+            format!("<div class=\"math-display\" data-latex=\"{escaped}\">\\[{escaped}\\]</div>\n")
+        }
+
+        Block::Callout { kind, content } => {
+            let label = kind.to_uppercase();
+            let inner = render_blocks(content, ctx);
+            format!(
+                "<div class=\"callout callout-{kind}\"><div class=\"callout-title\">{label}</div><div \
+                 class=\"callout-body\">{inner}</div></div>\n"
+            )
+        }
+
+        Block::Blockquote(content) => {
+            let inner = render_blocks(content, ctx);
+            format!("<blockquote>{inner}</blockquote>\n")
+        }
+
+        Block::List { ordered, start, items } => {
+            let tag = if *ordered { "ol" } else { "ul" };
+            let start_attr = if *ordered && *start != 1 {
+                format!(" start=\"{start}\"")
+            } else {
+                String::new()
+            };
+            let mut html = format!("<{tag}{start_attr}>\n");
+            for item in items {
+                // Tight list items: if just a single paragraph, render inlines
+                // directly without <p> wrapper to avoid block-level breaks.
+                let inner = if item.len() == 1 {
+                    if let Block::Paragraph(inlines) = &item[0] {
+                        render_inlines(inlines, ctx)
+                    } else {
+                        render_blocks(item, ctx)
+                    }
+                } else {
+                    render_blocks(item, ctx)
+                };
+                html.push_str(&format!("<li>{inner}</li>\n"));
+            }
+            html.push_str(&format!("</{tag}>\n"));
+            html
+        }
+
+        Block::Table {
+            alignments,
+            header,
+            rows,
+        } => {
+            let mut html = String::from("<table>\n<thead><tr>\n");
+            for (i, cell) in header.iter().enumerate() {
+                let align = alignments.get(i).copied().unwrap_or(Alignment::None);
+                let style = alignment_style(align);
+                let inner = render_inlines(cell, ctx);
+                html.push_str(&format!("<th{style}>{inner}</th>\n"));
+            }
+            html.push_str("</tr></thead>\n<tbody>\n");
+            for row in rows {
+                html.push_str("<tr>\n");
+                for (i, cell) in row.iter().enumerate() {
+                    let align = alignments.get(i).copied().unwrap_or(Alignment::None);
+                    let style = alignment_style(align);
+                    let inner = render_inlines(cell, ctx);
+                    html.push_str(&format!("<td{style}>{inner}</td>\n"));
+                }
+                html.push_str("</tr>\n");
+            }
+            html.push_str("</tbody></table>\n");
+            html
+        }
+
+        Block::FootnoteDef { id, content } => {
+            let num = ctx.footnote_number(id);
+            let inner = render_blocks(content, ctx);
+            format!(
+                "<div class=\"footnote-definition\" id=\"fn-{id}\"><span class=\"footnote-definition-label\"><a \
+                 href=\"#fnref-{id}\">{num}</a></span>{inner}</div>\n"
+            )
+        }
+
+        Block::TableOfContents(entries) => {
+            let min_level = entries.iter().map(|e| e.level).min().unwrap_or(1);
+            let mut html = String::from("<nav class=\"post-toc\"><details open><summary>Contents</summary><ul>\n");
+            for entry in entries {
+                let depth = entry.level.saturating_sub(min_level);
+                let num_span = if !entry.number.is_empty() {
+                    format!("<span class=\"toc-num\">{}</span>", html_escape(&entry.number))
+                } else {
+                    String::new()
+                };
+                let depth_class = match depth {
+                    0 => "",
+                    1 => " toc-h2",
+                    _ => " toc-h3",
+                };
+                html.push_str(&format!(
+                    "<li class=\"toc-entry{depth_class}\"><a href=\"#{}\">{}{}</a></li>\n",
+                    entry.id,
+                    num_span,
+                    html_escape(&entry.title)
+                ));
+            }
+            html.push_str("</ul></details></nav>\n");
+            html
+        }
+
+        Block::ThematicBreak => "<hr />\n".to_string(),
+
+        Block::Html(raw) => format!("{raw}\n"),
+    }
+}
+
+// ============================================================
+// Inline rendering
+// ============================================================
+
+fn render_inlines<F: Fn(&str) -> Option<PostPreview>>(inlines: &[Inline], ctx: &mut RenderContext<F>) -> String {
+    let mut html = String::new();
+    for inline in inlines {
+        html.push_str(&render_inline(inline, ctx));
+    }
+    return html;
+}
+
+fn render_inline<F: Fn(&str) -> Option<PostPreview>>(inline: &Inline, ctx: &mut RenderContext<F>) -> String {
+    match inline {
+        Inline::Text(text) => html_escape(text),
+
+        Inline::Bold(children) => {
+            format!("<strong>{}</strong>", render_inlines(children, ctx))
+        }
+
+        Inline::Italic(children) => {
+            format!("<em>{}</em>", render_inlines(children, ctx))
+        }
+
+        Inline::Strikethrough(children) => {
+            format!("<del>{}</del>", render_inlines(children, ctx))
+        }
+
+        Inline::Code(code) => {
+            format!("<code>{}</code>", html_escape(code))
+        }
+
+        Inline::Math(latex) => {
+            let escaped = html_escape(latex);
+            format!("<span class=\"math-inline\" data-latex=\"{escaped}\">\\({escaped}\\)</span>")
+        }
+
+        Inline::Link { url, children } => {
+            let inner = render_inlines(children, ctx);
+            let is_trackable = url.starts_with("/blog/") || url.starts_with("http");
+
+            if is_trackable {
+                let anchor_id = ctx.next_link_id(url);
+                let meta_attrs = ctx.post_metadata_attrs(url);
+                format!(
+                    "<a href=\"{url}\" id=\"{anchor_id}\"{meta_attrs} target=\"_blank\" rel=\"noopener\">{inner}</a>"
+                )
+            } else {
+                format!("<a href=\"{url}\" target=\"_blank\" rel=\"noopener\">{inner}</a>")
+            }
+        }
+
+        Inline::Image { url, alt, title: _ } => {
+            let id = ctx.next_image_id();
+            let escaped_alt = html_escape(alt);
+            format!(
+                "<figure id=\"img-{id}\" class=\"post-figure\"><img src=\"{url}\" alt=\"{escaped_alt}\" \
+                 loading=\"lazy\" /></figure>"
+            )
+        }
+
+        Inline::CrossRef {
+            label,
+            display,
+            kind,
+            title,
+            number,
+            content_preview,
+        } => {
+            let id = label.replace(':', "-");
+            let href = if label.contains('#') {
+                let parts: Vec<&str> = label.splitn(2, '#').collect();
+                format!("/blog/{}#{}", parts[0], parts[1].replace(':', "-"))
+            } else {
+                format!("#{id}")
+            };
+
+            let display_text = if display.is_empty() { label } else { display };
+
+            let mut attrs = format!(
+                "class=\"xref\" href=\"{href}\" data-preview=\"{}\"",
+                html_escape(content_preview)
+            );
+            if !kind.is_empty() {
+                attrs.push_str(&format!(
+                    " data-block-label=\"{}\" data-block-kind=\"{}\" data-block-title=\"{}\" data-block-number=\"{}\"",
+                    html_escape(label),
+                    html_escape(kind),
+                    html_escape(title),
+                    html_escape(number),
+                ));
+            }
+
+            format!("<a {attrs}>{}</a>", html_escape(display_text))
+        }
+
+        Inline::Citation {
+            key,
+            anchor_id,
+            display,
+            ..
+        } => {
+            let cite_id = format!("cite-{key}");
+            let id_attr = if !anchor_id.is_empty() {
+                format!(" id=\"{anchor_id}\"")
+            } else {
+                String::new()
+            };
+            let display_text = if display.is_empty() { key } else { display };
+            format!(
+                "<a href=\"#{cite_id}\"{id_attr} class=\"citation\">[{}]</a>",
+                html_escape(display_text)
+            )
+        }
+
+        Inline::FootnoteRef(id) => {
+            let num = ctx.footnote_number(id);
+            format!("<sup class=\"footnote-reference\"><a href=\"#fn-{id}\" id=\"fnref-{id}\">{num}</a></sup>")
+        }
+
+        Inline::SoftBreak => "\n".to_string(),
+        Inline::HardBreak => "<br />\n".to_string(),
+        Inline::Html(raw) => raw.clone(),
+    }
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+pub fn html_escape(input: &str) -> String {
+    return input
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;");
+}
+
+fn alignment_style(align: Alignment) -> String {
+    match align {
+        Alignment::None => String::new(),
+        Alignment::Left => " style=\"text-align:left\"".to_string(),
+        Alignment::Center => " style=\"text-align:center\"".to_string(),
+        Alignment::Right => " style=\"text-align:right\"".to_string(),
+    }
+}
 
 fn render_diff_code(text: &str) -> String {
     let mut result = String::new();
@@ -354,214 +566,4 @@ fn render_diff_code(text: &str) -> String {
         }
     }
     return result;
-}
-
-// ============================================================
-// Callout post-processing
-// ============================================================
-
-/// Converts blockquotes starting with `[!TYPE]` into styled admonition blocks.
-fn process_callouts(html: &str) -> String {
-    let callout_types = ["info", "warning", "tip", "danger", "note"];
-    let mut result = html.to_string();
-
-    for callout_type in &callout_types {
-        let marker = format!("[!{callout_type}]");
-        let uppercase_label = callout_type.to_uppercase();
-
-        let search_with_newline = format!("<blockquote>\n<p>{marker}");
-        let replacement = format!(
-            "<div class=\"callout callout-{callout_type}\"><div class=\"callout-title\">{uppercase_label}</div><div \
-             class=\"callout-body\"><p>"
-        );
-        result = result.replace(&search_with_newline, &replacement);
-
-        let search_with_double_newline = format!("<blockquote>\n<p>{marker}\n");
-        let replacement_alt = format!(
-            "<div class=\"callout callout-{callout_type}\"><div class=\"callout-title\">{uppercase_label}</div><div \
-             class=\"callout-body\"><p>"
-        );
-        result = result.replace(&search_with_double_newline, &replacement_alt);
-    }
-
-    let mut processed = String::new();
-    let mut inside_callout = false;
-    for line in result.lines() {
-        if line.contains("class=\"callout ") {
-            inside_callout = true;
-        }
-        if inside_callout && line.contains("</blockquote>") {
-            processed.push_str(&line.replace("</blockquote>", "</div></div>"));
-            processed.push('\n');
-            inside_callout = false;
-        } else {
-            processed.push_str(line);
-            processed.push('\n');
-        }
-    }
-
-    return processed;
-}
-
-// ============================================================
-// Labeled block post-processing
-// ============================================================
-
-/// Converts `<!--BLOCK|kind|id|number|title-->...<!--/BLOCK-->` markers into styled divs.
-fn process_labeled_blocks(html: &str) -> String {
-    let mut result = String::new();
-    let mut remaining = html;
-
-    while let Some(start_position) = remaining.find("<!--BLOCK|") {
-        result.push_str(&remaining[..start_position]);
-        let after_marker = &remaining[start_position..];
-
-        if let Some(header_end) = after_marker.find("-->") {
-            let header = &after_marker[10..header_end];
-            let after_header = &after_marker[header_end + 3..];
-
-            if let Some(block_end) = after_header.find("<!--/BLOCK-->") {
-                let content = after_header[..block_end].trim();
-                let parts: Vec<&str> = header.splitn(4, '|').collect();
-
-                if parts.len() == 4 {
-                    let kind = parts[0];
-                    let id = parts[1];
-                    let number = parts[2];
-                    let title = parts[3].replace("\\|", "|");
-
-                    let kind_display = super::capitalize(kind);
-                    let is_proof = kind == "proof";
-
-                    let header_html = if is_proof {
-                        if title.is_empty() {
-                            "<strong>Proof.</strong>".to_string()
-                        } else {
-                            format!("<strong>Proof</strong> ({title})<strong>.</strong>")
-                        }
-                    } else if !number.is_empty() {
-                        if title.is_empty() {
-                            format!("<strong>{kind_display} {number}.</strong>")
-                        } else {
-                            format!("<strong>{kind_display} {number}</strong> ({title})<strong>.</strong>")
-                        }
-                    } else {
-                        format!("<strong>{kind_display}.</strong>")
-                    };
-
-                    let qed_marker = if is_proof {
-                        "\n<span class=\"qed\">\u{220e}</span>"
-                    } else {
-                        ""
-                    };
-
-                    result.push_str(&format!(
-                        "<div class=\"labeled-block {kind}\" id=\"{id}\"><div \
-                         class=\"labeled-block-header\">{header_html}</div><div \
-                         class=\"labeled-block-content\">{content}</div>{qed_marker}</div>"
-                    ));
-                } else {
-                    result.push_str(content);
-                }
-
-                remaining = &after_header[block_end + 13..];
-            } else {
-                result.push_str(&remaining[..start_position + header_end + 3]);
-                remaining = after_header;
-            }
-        } else {
-            result.push_str(&remaining[..start_position + 10]);
-            remaining = &after_marker[10..];
-        }
-    }
-
-    result.push_str(remaining);
-    return result;
-}
-
-// ============================================================
-// Text transformation helpers
-// ============================================================
-
-fn slugify(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() {
-                character
-            } else if character == ' ' || character == '-' || character == '_' {
-                '-'
-            } else {
-                '\0'
-            }
-        })
-        .filter(|&character| character != '\0')
-        .collect::<String>()
-        .split('-')
-        .filter(|segment| !segment.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
-
-fn html_escape(input: &str) -> String {
-    return input
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;");
-}
-
-// ============================================================
-// XRef link tracking
-// ============================================================
-
-fn extract_xref_links(html: &str, link_occurrences: &mut HashMap<String, Vec<String>>) -> String {
-    let mut result = html.to_string();
-    let mut link_counter = 1000;
-
-    for class in ["xref", "auto-def"] {
-        let search_pattern = format!("class=\"{}\"", class);
-        let mut offsets_to_insert: Vec<(usize, String)> = Vec::new();
-
-        let mut search_start = 0;
-        while let Some(class_pos) = result[search_start..].find(&search_pattern) {
-            let absolute_pos = search_start + class_pos;
-            let after_class = absolute_pos + search_pattern.len();
-
-            let href_start = match result[after_class..].find("href=\"") {
-                Some(pos) => after_class + pos + 6,
-                None => {
-                    search_start = absolute_pos + 1;
-                    continue;
-                }
-            };
-            let href_end = match result[href_start..].find('"') {
-                Some(pos) => href_start + pos,
-                None => {
-                    search_start = absolute_pos + 1;
-                    continue;
-                }
-            };
-
-            let href = &result[href_start..href_end].to_string();
-            if href.starts_with("/blog/") || href.starts_with("http") {
-                link_counter += 1;
-                let anchor_id = format!("ref-{}", link_counter);
-                let url_without_fragment = href.split('#').next().unwrap_or(href);
-                link_occurrences
-                    .entry(url_without_fragment.to_string())
-                    .or_default()
-                    .push(anchor_id.clone());
-                offsets_to_insert.push((absolute_pos, format!(" id=\"{}\"", anchor_id)));
-            }
-
-            search_start = absolute_pos + 1;
-        }
-
-        for (pos, insert_text) in offsets_to_insert.into_iter().rev() {
-            result.insert_str(pos, &insert_text);
-        }
-    }
-
-    result
 }

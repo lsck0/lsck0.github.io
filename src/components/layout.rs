@@ -1,17 +1,27 @@
 use leptos::prelude::*;
 
-use super::{footer::Footer, header::Header, pinned_panel::PinnedPanel, post_search::GlobalSearch, sidebar::Sidebar};
+use super::{
+    SidebarState, footer::Footer, header::Header, pinned_panel::PinnedPanel, post_search::GlobalSearch,
+    sidebar::Sidebar,
+};
 
 #[component]
 pub fn Layout(children: Children) -> impl IntoView {
+    let state = use_context::<SidebarState>().expect("SidebarState context");
+
     return view! {
         <div class="marquee-container">
             <marquee>
-                "WORK IN PROGRESS; ALL CONTENT IS AI GENERATED SLOPPERY FOR QA TESTING"
+                "WORK IN PROGRESS \u{00b7} ALL CONTENT IS AI GENERATED \u{00b7} WORK IN PROGRESS \u{00b7} ALL CONTENT IS AI GENERATED"
             </marquee>
         </div>
         <Header />
         <GlobalSearch />
+        <div
+            class="sidebar-overlay"
+            class:visible=move || state.is_mobile_open.get()
+            on:click=move |_| state.is_mobile_open.set(false)
+        />
         <div class="page-layout">
             <Sidebar />
             <main>{children()}</main>

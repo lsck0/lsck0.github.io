@@ -4,22 +4,26 @@ use leptos_router::components::A;
 
 use crate::{components::layout::Layout, models::meta::META};
 
-const ASCII_404: &str = r#" _  _    ___  _  _
-| || |  / _ \| || |
-| || |_| | | | || |_
-|__   _| | | |__   _|
-   | | | |_| |  | |
-   |_|  \___/   |_|"#;
-
 #[component]
 pub fn NotFoundPage() -> impl IntoView {
     return view! {
         <Title text=format!("\u{03bb} {} \u{2014} 404", META.title) />
         <Layout>
             <main class="not-found">
-                <pre class="ascii-404">{ASCII_404}</pre>
-                <p>"The page you're looking for doesn't exist."</p>
-                <A href="/">"go home"</A>
+                <div class="not-found-glitch" data-text="404">
+                    "404"
+                </div>
+                <p class="not-found-message">
+                    "the page you're looking for has vanished into the void"
+                </p>
+                <div class="not-found-suggestions">
+                    <p class="not-found-hint">"perhaps you meant to visit:"</p>
+                    <nav class="not-found-links">
+                        <A href="/">"home"</A>
+                        <A href="/blog">"blog"</A>
+                        <A href="/about">"about"</A>
+                    </nav>
+                </div>
             </main>
         </Layout>
     };

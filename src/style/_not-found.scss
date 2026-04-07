@@ -3,33 +3,102 @@
 .not-found {
   text-align: center;
   padding: 4rem 0;
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
 
-  .ascii-404 {
-    font-size: 1rem;
-    line-height: 1.2;
-    color: var(--accent);
-    margin-bottom: 1.5rem;
-    display: block;
-    font-family: monospace;
-    white-space: pre;
-    letter-spacing: 0;
+.not-found-glitch {
+  font-size: 6rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  position: relative;
+  animation: flicker 3s infinite;
 
-    @media (max-width: 480px) {
-      font-size: 0.8rem;
-    }
+  &::before,
+  &::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
   }
 
-  p {
-    font-size: 1.2rem;
-    margin-bottom: 1.5rem;
-    color: var(--text-muted);
+  &::before {
+    color: #ff0040;
+    animation: glitch-1 0.15s infinite;
+    clip-path: polygon(0 0, 100% 0, 100% 40%, 0 40%);
+    opacity: 0.9;
   }
+
+  &::after {
+    color: #00f0ff;
+    animation: glitch-2 0.15s infinite;
+    clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%);
+    opacity: 0.9;
+  }
+}
+
+@keyframes flicker {
+  0%, 88%, 90%, 92%, 94%, 96%, 100% { opacity: 1; }
+  89%, 91%, 93%, 95% { opacity: 0.6; }
+}
+
+@keyframes glitch-1 {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-6px, 2px); }
+  40% { transform: translate(4px, -3px); }
+  60% { transform: translate(-3px, 4px); }
+  80% { transform: translate(5px, -2px); }
+}
+
+@keyframes glitch-2 {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(5px, -2px); }
+  40% { transform: translate(-4px, 3px); }
+  60% { transform: translate(3px, -4px); }
+  80% { transform: translate(-6px, 2px); }
+}
+
+.not-found-message {
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin: 1.5rem 0 2rem;
+  font-style: italic;
+}
+
+.not-found-suggestions {
+  margin-bottom: 2.5rem;
+}
+
+.not-found-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+  opacity: 0.7;
+}
+
+.not-found-links {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
 
   a {
-    color: var(--accent);
+    color: var(--text);
     text-decoration: none;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    transition: border-color 0.15s ease, color 0.15s ease;
+
     &:hover {
-      text-decoration: underline;
+      border-color: var(--accent);
+      color: var(--accent);
     }
   }
 }
+

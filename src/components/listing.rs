@@ -50,6 +50,15 @@ pub fn render_segments(segments: &'static [TextSegment]) -> impl IntoView {
         .collect_view()
 }
 
+/// Renders a sidebar label: scrambled titles get a teaser wrapper, plain titles render as text.
+pub fn sidebar_label(title: &'static [TextSegment]) -> impl IntoView {
+    if segments_has_scrambled(title) {
+        view! { <span class="teaser">{render_segments(title)}</span> }.into_any()
+    } else {
+        view! { {segments_plain_value(title)} }.into_any()
+    }
+}
+
 // ============================================================
 // Listing Title
 // ============================================================
@@ -103,7 +112,7 @@ pub fn render_related_posts(title: &str, kind: RelatedKind) -> Option<impl IntoV
         .enumerate()
         .map(|(index, post)| {
             let is_last = index + 1 >= total_count;
-            let slug = post.slug;
+            let slug = post.slug();
             let title = post.title();
             let desc = post.description();
             let tags = post.tags().join(", ");
@@ -255,9 +264,10 @@ pub fn ProjectListing(entries: &'static [ProjectEntry]) -> impl IntoView {
 
     let professional: Vec<_> = entries.iter().filter(|e| e.is_professional()).collect();
     let private: Vec<_> = entries.iter().filter(|e| !e.is_professional()).collect();
+    let has_professional = !professional.is_empty();
+    let has_private = !private.is_empty();
 
     let professional_views: Vec<_> = professional
-        .clone()
         .into_iter()
         .map(|entry| {
             let plain_title = segments_plain_value(entry.title);
@@ -324,7 +334,7 @@ pub fn ProjectListing(entries: &'static [ProjectEntry]) -> impl IntoView {
 
     return view! {
         <div id="listing-content" class="listing">
-            {if !private.is_empty() {
+            {if has_private {
                 view! {
                     <div class="project-category">
                         <h1 class="project-category-title">"Private Projects"</h1>
@@ -335,7 +345,7 @@ pub fn ProjectListing(entries: &'static [ProjectEntry]) -> impl IntoView {
             } else {
                 view! { <div /> }.into_any()
             }}
-            {if !professional.is_empty() {
+            {if has_professional {
                 view! {
                     <div class="project-category">
                         <h1 class="project-category-title">"Professional Projects"</h1>

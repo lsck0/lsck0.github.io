@@ -39,10 +39,10 @@ impl Default for SidebarState {
 impl SidebarState {
     pub fn new() -> Self {
         let mut initially_collapsed_folders = BTreeSet::new();
-        for post in POSTS {
-            if !post.folder.is_empty() {
+        for post in POSTS.iter() {
+            if !post.folder().is_empty() {
                 let mut folder_prefix = String::new();
-                for (segment_index, segment) in post.folder.split('/').enumerate() {
+                for (segment_index, segment) in post.folder().split('/').enumerate() {
                     if segment_index > 0 {
                         folder_prefix.push('/');
                     }
@@ -53,8 +53,11 @@ impl SidebarState {
         }
 
         let mut initially_collapsed_project_groups = BTreeSet::new();
+        initially_collapsed_project_groups.insert("private".to_string());
+        initially_collapsed_project_groups.insert("professional".to_string());
         for status in ProjectStatus::all() {
-            initially_collapsed_project_groups.insert(status.id().to_string());
+            initially_collapsed_project_groups.insert(format!("private-{}", status.id()));
+            initially_collapsed_project_groups.insert(format!("professional-{}", status.id()));
         }
 
         return Self {
@@ -94,18 +97,21 @@ const RERENDER_MERMAID_AND_GISCUS_JS: &str = r#"
 "#;
 
 pub fn toggle_theme() {
-    let window = web_sys::window().unwrap();
-    let document = window.document().unwrap();
-    let html_element = document.document_element().unwrap();
+    let Some(window) = web_sys::window() else { return };
+    let Some(document) = window.document() else { return };
+    let Some(html_element) = document.document_element() else {
+        return;
+    };
 
     let current_theme = html_element
         .get_attribute("data-theme")
         .unwrap_or_else(|| "light".to_string());
     let new_theme = if current_theme == "light" { "dark" } else { "light" };
 
-    html_element.set_attribute("data-theme", new_theme).unwrap();
-    let local_storage = window.local_storage().unwrap().unwrap();
-    local_storage.set_item("theme", new_theme).unwrap();
+    let _ = html_element.set_attribute("data-theme", new_theme);
+    if let Ok(Some(local_storage)) = window.local_storage() {
+        let _ = local_storage.set_item("theme", new_theme);
+    }
 
     let giscus_theme = giscus_theme_for(new_theme);
     let rerender_script = RERENDER_MERMAID_AND_GISCUS_JS
@@ -121,15 +127,6 @@ pub fn toggle_theme() {
 /// Map site theme name to Giscus theme name.
 pub fn giscus_theme_for(theme: &str) -> &'static str {
     if theme == "light" { "light" } else { "dark_dimmed" }
-}
-
-/// Capitalize the first character of a string.
-pub fn capitalize(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => c.to_uppercase().to_string() + chars.as_str(),
-    }
 }
 
 /// Toggle membership of an item in a BTreeSet (insert if absent, remove if present).

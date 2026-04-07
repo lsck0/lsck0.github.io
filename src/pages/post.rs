@@ -8,7 +8,7 @@ use crate::{
         SidebarState,
         layout::Layout,
         post_search::PostSearch,
-        render::markdown_to_html,
+        render::render_post_content,
         storage::{is_bookmarked, set_bookmarked},
     },
     models::{
@@ -63,7 +63,7 @@ pub fn PostPage() -> impl IntoView {
         params.with(|map| {
             let slug = map.get("slug")?;
             let slug = slug.trim_end_matches('/');
-            POSTS.iter().find(|post| post.slug == slug)
+            POSTS.iter().find(|post| post.slug() == slug)
         })
     };
 
@@ -72,7 +72,7 @@ pub fn PostPage() -> impl IntoView {
 
     Effect::new(move |_: Option<()>| {
         if let Some(post) = current_post() {
-            crate::components::storage::mark_read(post.slug);
+            crate::components::storage::mark_read(post.slug());
         }
     });
 
@@ -93,10 +93,10 @@ fn setup_sidebar_expansion(current_post: impl Fn() -> Option<&'static Post> + Se
         if let Some(post) = current_post() {
             if let Some(state) = use_context::<SidebarState>() {
                 state.is_blog_open.set(true);
-                if !post.folder.is_empty() {
+                if !post.folder().is_empty() {
                     state.collapsed_folders.update(|folders| {
                         let mut folder_prefix = String::new();
-                        for (segment_index, segment) in post.folder.split('/').enumerate() {
+                        for (segment_index, segment) in post.folder().split('/').enumerate() {
                             if segment_index > 0 {
                                 folder_prefix.push('/');
                             }
@@ -117,7 +117,7 @@ fn setup_sidebar_expansion(current_post: impl Fn() -> Option<&'static Post> + Se
 
 fn setup_scroll_progress(scroll_progress: RwSignal<f64>, show_scroll_top: RwSignal<bool>) {
     Effect::new(move |_: Option<()>| {
-        let window = web_sys::window().unwrap();
+        let Some(window) = web_sys::window() else { return };
         let closure = Closure::<dyn Fn()>::new(move || {
             let Some(window) = web_sys::window() else { return };
             let Some(document) = window.document() else { return };
@@ -125,7 +125,7 @@ fn setup_scroll_progress(scroll_progress: RwSignal<f64>, show_scroll_top: RwSign
                 return;
             };
             let bounding_rect = post_content.get_bounding_client_rect();
-            let viewport_height = window.inner_height().unwrap().as_f64().unwrap_or(1.0);
+            let viewport_height = window.inner_height().ok().and_then(|v| v.as_f64()).unwrap_or(1.0);
 
             let scrollable_distance = bounding_rect.height() - viewport_height;
             if scrollable_distance <= 0.0 {
@@ -139,7 +139,7 @@ fn setup_scroll_progress(scroll_progress: RwSignal<f64>, show_scroll_top: RwSign
         });
 
         let handler: js_sys::Function = closure.into_js_value().unchecked_into();
-        window.add_event_listener_with_callback("scroll", &handler).unwrap();
+        let _ = window.add_event_listener_with_callback("scroll", &handler);
 
         on_cleanup(move || {
             if let Some(window) = web_sys::window() {
@@ -154,9 +154,7 @@ fn setup_scroll_progress(scroll_progress: RwSignal<f64>, show_scroll_top: RwSign
 // ============================================================
 
 fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_top: RwSignal<bool>) -> impl IntoView {
-    let rendered = markdown_to_html(post.body);
-    let content_html = rendered.html;
-    let link_occurrences = rendered.link_occurrences;
+    let (content_html, link_occurrences) = render_post_content(post.content(), post);
 
     let outgoing_links: Vec<PostLink> = post
         .outgoing_links()
@@ -178,7 +176,7 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
         .collect();
 
     let external_links: Vec<ExternalLink> = post
-        .external_links
+        .external_links()
         .iter()
         .map(|url| {
             let url_without_fragment = url.split('#').next().unwrap_or(url);
@@ -190,11 +188,11 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
         })
         .collect();
 
-    let sources: Vec<String> = post.sources.iter().map(|source_url| source_url.to_string()).collect();
+    let sources: Vec<String> = post.sources().iter().map(|source_url| source_url.to_string()).collect();
 
-    let bookmarked = RwSignal::new(is_bookmarked(post.slug));
+    let bookmarked = RwSignal::new(is_bookmarked(post.slug()));
 
-    let slug_for_bookmark = post.slug.to_string();
+    let slug_for_bookmark = post.slug().to_string();
     let toggle_bookmark = move |_| {
         let current = bookmarked.get();
         set_bookmarked(&slug_for_bookmark, !current);
@@ -205,12 +203,7 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
         let _ = js_sys::eval("window.scrollTo({top: 0, behavior: 'smooth'})");
     };
 
-    let (toc_html, content_html) = if post.toc() {
-        let (toc, numbered) = generate_toc(&content_html);
-        (Some(toc), numbered)
-    } else {
-        (None, content_html)
-    };
+    let citations = post.citations();
 
     view! {
         <Title text=format!("\u{03bb} {} \u{2014} {}", META.title, post.title()) />
@@ -280,17 +273,14 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
                             .collect_view()}
                     </span>
                 </div> {render_series_navigation(post)}
-                {toc_html
-                    .map(|html| {
-                        view! {
-                            <details class="post-toc">
-                                <summary>"Table of Contents"</summary>
-                                <nav inner_html=html />
-                            </details>
-                        }
-                    })} <div class="content" inner_html=content_html />
-                {render_references(outgoing_links, incoming_links, external_links, sources)}
-                {render_giscus()}
+                <div class="content" inner_html=content_html />
+                {render_references(
+                    outgoing_links,
+                    incoming_links,
+                    external_links,
+                    citations,
+                    sources,
+                )} {render_giscus()}
             </article>
             <button
                 class="scroll-to-top"
@@ -305,138 +295,6 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
 }
 
 // ============================================================
-// Table of Contents
-// ============================================================
-
-/// Extract headings from rendered HTML, returning (level, id, text) tuples.
-fn extract_headings(content_html: &str) -> Vec<(u8, String, String)> {
-    let mut headings = Vec::new();
-    let mut remaining = content_html;
-
-    while let Some(pos) = remaining.find("<h") {
-        let after = &remaining[pos + 2..];
-        let Some(level_char) = after.chars().next() else {
-            remaining = after;
-            continue;
-        };
-        let level = match level_char {
-            '1' => 1,
-            '2' => 2,
-            '3' => 3,
-            _ => {
-                remaining = after;
-                continue;
-            }
-        };
-
-        let header_tag_end = after.find('>').unwrap_or(0);
-        let header_tag = &after[..header_tag_end];
-        let id = if let Some(id_start) = header_tag.find("id=\"") {
-            let id_content = &header_tag[id_start + 4..];
-            id_content.split('"').next().unwrap_or("").to_string()
-        } else {
-            String::new()
-        };
-
-        let content_start = header_tag_end + 1;
-        let close_tag = format!("</h{level_char}>");
-        if let Some(close_pos) = after[content_start..].find(&close_tag) {
-            let raw_text = &after[content_start..content_start + close_pos];
-            let text = strip_html_tags(raw_text);
-            headings.push((level, id, text));
-            remaining = &after[content_start + close_pos + close_tag.len()..];
-        } else {
-            remaining = after;
-        }
-    }
-    return headings;
-}
-
-/// Build a section number string for the given counters and depth.
-/// Uses relative indexing from the minimum heading level so numbering always starts at 1.
-fn section_number(counters: &[u32], depth: usize) -> String {
-    counters[..=depth]
-        .iter()
-        .map(|c| c.to_string())
-        .collect::<Vec<_>>()
-        .join(".")
-}
-
-/// Generate the TOC HTML and inject section numbers into content headings.
-fn generate_toc(content_html: &str) -> (String, String) {
-    let headings = extract_headings(content_html);
-    if headings.is_empty() {
-        return (String::from("<ul></ul>"), content_html.to_string());
-    }
-
-    // Determine the minimum heading level to use as the "major" level
-    let min_level = headings.iter().map(|(l, _, _)| *l).min().unwrap_or(1);
-
-    let mut toc = String::from("<ul>");
-    let mut counters = [0u32; 3];
-
-    // Also build a map of id → section number to inject into content
-    let mut section_numbers: Vec<(String, String)> = Vec::new();
-
-    for (level, id, text) in &headings {
-        let relative_depth = (*level - min_level) as usize;
-        let depth = relative_depth.min(2);
-
-        counters[depth] += 1;
-        for counter in &mut counters[depth + 1..] {
-            *counter = 0;
-        }
-
-        let sec_num = section_number(&counters, depth);
-
-        let class = match relative_depth {
-            1 => " class=\"toc-h2\"",
-            2.. => " class=\"toc-h3\"",
-            _ => "",
-        };
-
-        if !id.is_empty() {
-            toc.push_str(&format!(
-                "<li{class}><a href=\"#{id}\"><span class=\"toc-num\">{sec_num}</span> {text}</a></li>"
-            ));
-            section_numbers.push((id.clone(), sec_num));
-        } else {
-            toc.push_str(&format!(
-                "<li{class}><span class=\"toc-num\">{sec_num}</span> {text}</li>"
-            ));
-        }
-    }
-    toc.push_str("</ul>");
-
-    // Inject section numbers into the actual content headings
-    let mut numbered_content = content_html.to_string();
-    for (id, sec_num) in section_numbers.iter().rev() {
-        let search = format!("id=\"{id}\">");
-        if let Some(pos) = numbered_content.find(&search) {
-            let insert_pos = pos + search.len();
-            numbered_content.insert_str(insert_pos, &format!("<span class=\"heading-num\">{sec_num}</span> "));
-        }
-    }
-
-    return (toc, numbered_content);
-}
-
-fn strip_html_tags(html: &str) -> String {
-    let mut result = String::new();
-    let mut in_tag = false;
-    for character in html.chars() {
-        if character == '<' {
-            in_tag = true;
-        } else if character == '>' {
-            in_tag = false;
-        } else if !in_tag {
-            result.push(character);
-        }
-    }
-    return result;
-}
-
-// ============================================================
 // Series navigation
 // ============================================================
 
@@ -445,7 +303,7 @@ fn render_series_navigation(post: &'static Post) -> Option<impl IntoView> {
     let series_posts = post.series_posts();
     let current_index = series_posts
         .iter()
-        .position(|series_post| series_post.slug == post.slug);
+        .position(|series_post| series_post.slug() == post.slug());
     let total = series_posts.len();
 
     let previous_post = current_index.and_then(|index| {
@@ -463,10 +321,10 @@ fn render_series_navigation(post: &'static Post) -> Option<impl IntoView> {
         .iter()
         .enumerate()
         .map(|(i, series_post)| {
-            let num = format!("{}.", i + 1);
+            let num = format!("{}", i + 1);
             let href = series_post.href();
             let title = series_post.title().to_string();
-            let is_current = series_post.slug == post.slug;
+            let is_current = series_post.slug() == post.slug();
             if is_current {
                 view! {
                     <li>
@@ -576,15 +434,67 @@ fn render_references(
     outgoing: Vec<PostLink>,
     incoming: Vec<PostLink>,
     external: Vec<ExternalLink>,
+    citations: &[ir::types::CitationMeta],
     sources: Vec<String>,
 ) -> impl IntoView {
-    let has_any = !outgoing.is_empty() || !incoming.is_empty() || !external.is_empty() || !sources.is_empty();
+    let has_any = !outgoing.is_empty()
+        || !incoming.is_empty()
+        || !external.is_empty()
+        || !citations.is_empty()
+        || !sources.is_empty();
     if !has_any {
-        return view! { <div /> }.into_any();
+        return view! { <span /> }.into_any();
     }
 
-    return view! {
+    view! {
         <div class="post-references">
+            {(!citations.is_empty())
+                .then(|| {
+                    let citation_views = citations
+                        .iter()
+                        .map(|cite| {
+                            let cite_id = format!("cite-{}", cite.key);
+                            let label = cite.label.clone();
+                            let backlink_ids = cite.backlink_ids.clone();
+                            view! {
+                                <li id=cite_id>
+                                    <span class="cite-label">{"["}{label}{"] "}</span>
+                                    <span inner_html=cite.formatted_html.clone() />
+                                    {render_backlinks(backlink_ids)}
+                                </li>
+                            }
+                        })
+                        .collect_view();
+                    view! {
+                        <div class="ref-section">
+                            <h2>"Citations"</h2>
+                            <ol class="citation-list">{citation_views}</ol>
+                        </div>
+                    }
+                })}
+            {(!sources.is_empty())
+                .then(|| {
+                    view! {
+                        <div class="ref-section">
+                            <h2>"Sources"</h2>
+                            <ul>
+                                {sources
+                                    .into_iter()
+                                    .map(|url| {
+                                        let display = url.clone();
+                                        view! {
+                                            <li>
+                                                <a href=url target="_blank">
+                                                    {display}
+                                                </a>
+                                            </li>
+                                        }
+                                    })
+                                    .collect_view()}
+                            </ul>
+                        </div>
+                    }
+                })}
             {(!outgoing.is_empty())
                 .then(|| {
                     view! {
@@ -618,29 +528,6 @@ fn render_references(
                         </div>
                     }
                 })}
-            {(!sources.is_empty())
-                .then(|| {
-                    view! {
-                        <div class="ref-section">
-                            <h2>"Sources"</h2>
-                            <ul>
-                                {sources
-                                    .into_iter()
-                                    .map(|url| {
-                                        let display = url.clone();
-                                        view! {
-                                            <li>
-                                                <a href=url target="_blank">
-                                                    {display}
-                                                </a>
-                                            </li>
-                                        }
-                                    })
-                                    .collect_view()}
-                            </ul>
-                        </div>
-                    }
-                })}
             {(!incoming.is_empty())
                 .then(|| {
                     view! {
@@ -652,7 +539,7 @@ fn render_references(
                 })}
         </div>
     }
-    .into_any();
+    .into_any()
 }
 
 // ============================================================
@@ -673,28 +560,28 @@ fn render_giscus() -> impl IntoView {
             .unwrap_or_else(|| "dark".to_string());
         let giscus_theme = crate::components::giscus_theme_for(&theme);
 
-        let script = document.create_element("script").unwrap();
-        script.set_attribute("src", "https://giscus.app/client.js").unwrap();
-        script.set_attribute("data-repo", "lsck0/lsck0.github.io").unwrap();
-        script.set_attribute("data-repo-id", "R_kgDORX3_qQ").unwrap();
-        script.set_attribute("data-category", "Comments").unwrap();
-        script
-            .set_attribute("data-category-id", "DIC_kwDORX3_qc4C4jik")
-            .unwrap();
-        script.set_attribute("data-mapping", "pathname").unwrap();
-        script.set_attribute("data-strict", "1").unwrap();
-        script.set_attribute("data-reactions-enabled", "1").unwrap();
-        script.set_attribute("data-emit-metadata", "0").unwrap();
-        script.set_attribute("data-input-position", "top").unwrap();
-        script.set_attribute("data-theme", giscus_theme).unwrap();
-        script.set_attribute("data-lang", "en").unwrap();
-        script.set_attribute("data-loading", "lazy").unwrap();
-        script.set_attribute("crossorigin", "anonymous").unwrap();
-        script.set_attribute("async", "").unwrap();
+        let Ok(script) = document.create_element("script") else {
+            return;
+        };
+        let _ = script.set_attribute("src", "https://giscus.app/client.js");
+        let _ = script.set_attribute("data-repo", "lsck0/lsck0.github.io");
+        let _ = script.set_attribute("data-repo-id", "R_kgDORX3_qQ");
+        let _ = script.set_attribute("data-category", "Comments");
+        let _ = script.set_attribute("data-category-id", "DIC_kwDORX3_qc4C4jik");
+        let _ = script.set_attribute("data-mapping", "pathname");
+        let _ = script.set_attribute("data-strict", "1");
+        let _ = script.set_attribute("data-reactions-enabled", "1");
+        let _ = script.set_attribute("data-emit-metadata", "0");
+        let _ = script.set_attribute("data-input-position", "top");
+        let _ = script.set_attribute("data-theme", giscus_theme);
+        let _ = script.set_attribute("data-lang", "en");
+        let _ = script.set_attribute("data-loading", "lazy");
+        let _ = script.set_attribute("crossorigin", "anonymous");
+        let _ = script.set_attribute("async", "");
 
         let element: &web_sys::Element = container.as_ref();
         element.set_inner_html("");
-        element.append_child(&script).unwrap();
+        let _ = element.append_child(&script);
     });
 
     view! { <div class="giscus-container" node_ref=container_ref /> }

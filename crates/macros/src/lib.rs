@@ -2,11 +2,17 @@
 
 use proc_macro::TokenStream;
 
+mod include_macros;
 mod include_meta;
 mod include_posts;
 mod include_projects;
 mod include_publications;
 mod toml_segments;
+
+#[proc_macro]
+pub fn include_katex_macros(input: TokenStream) -> TokenStream {
+    return include_macros::include_macros_impl(input);
+}
 
 #[proc_macro]
 pub fn include_meta(input: TokenStream) -> TokenStream {

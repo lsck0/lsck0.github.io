@@ -1,906 +1,211 @@
-use std::{collections::HashMap, env, path::PathBuf};
+#![allow(clippy::needless_return)]
 
-use content::{
-    ParsedPost, extract_external_links, extract_internal_links, parse_posts_directory, resolve_transclusions,
-};
+//! Proc macro that reads all markdown posts from `content/posts/`, parses them
+//! into IR, resolves cross-references and citations, then serializes the result
+//! as a `postcard`-encoded byte blob embedded in the binary.
+//!
+//! At runtime the frontend deserializes once and renders from the IR.
+
+use std::{collections::HashMap, env, fs, path::PathBuf};
+
+use ir::{bib, frontmatter::parse_frontmatter, parse::parse_markdown, resolve, types::*};
 use proc_macro::TokenStream;
 use quote::quote;
-
-// ============================================================
-// Labeled block kinds
-// ============================================================
-
-const NUMBERED_KINDS: &[&str] = &[
-    "definition",
-    "theorem",
-    "lemma",
-    "corollary",
-    "proposition",
-    "example",
-    "axiom",
-    "remark",
-    "conjecture",
-    "exercise",
-    "problem",
-];
-const UNNUMBERED_KINDS: &[&str] = &["proof"];
-const CALLOUT_KINDS: &[&str] = &["tip", "warning", "danger", "note", "info"];
-
-// ============================================================
-// Labeled block data
-// ============================================================
-
-struct LabeledBlock {
-    label: String,
-    kind: String,
-    title: String,
-    aliases: Vec<String>,
-    number: String,
-    content: String,
-}
 
 // ============================================================
 // Entry point
 // ============================================================
 
 pub fn include_posts_impl(_input: TokenStream) -> TokenStream {
-    let manifest_directory = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
-    let content_directory = PathBuf::from(&manifest_directory).join("content/posts");
-    if !content_directory.exists() {
-        panic!("Content directory not found at {}.", content_directory.display());
+    let content_dir = content_dir();
+
+    // ---- Read all markdown files ----
+    let mut pages = read_posts(&content_dir.join("posts"));
+
+    // ---- Read bibliography ----
+    let bib_path = content_dir.join("references.bib");
+    let bibliography = if bib_path.exists() {
+        bib::parse_bib_file(&bib_path)
+    } else {
+        HashMap::new()
+    };
+
+    // ---- Parse markdown into IR ----
+    for page in &mut pages {
+        let has_toc = page.metadata.get("toc").is_some_and(|v| v == "true");
+        let (content, block_metas) = parse_markdown(page.metadata.get("body").unwrap_or(&String::new()), has_toc);
+        page.content = content;
+        page.blocks = block_metas;
+
+        // Extract sources from metadata
+        if let Some(sources_str) = page.metadata.get("sources") {
+            page.sources = sources_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+        }
     }
 
-    let mut posts = parse_posts_directory(&content_directory);
-    resolve_transclusions(&mut posts);
+    // ---- Build label registry (all blocks across all pages) ----
+    let registry = resolve::build_label_registry(&pages);
 
-    // Extract labeled blocks from all posts
-    let mut blocks_per_post: Vec<Vec<LabeledBlock>> = Vec::new();
-    for post in &mut posts {
-        let has_toc = post.metadata.get("toc").is_some_and(|v| v == "true");
-        let (new_body, blocks) = extract_labeled_blocks(&post.body, has_toc);
-        post.body = new_body;
-        blocks_per_post.push(blocks);
+    // ---- Resolve references ----
+    for page in &mut pages {
+        let slug = page.slug.clone();
+
+        // Cross-references
+        resolve::resolve_cross_references(&mut page.content, &slug, &registry);
+
+        // Citations
+        let citation_metas = resolve::resolve_citations(&mut page.content, &bibliography, &slug);
+        page.citations = citation_metas;
+
+        // Auto-link definitions
+        resolve::auto_link_definitions(&mut page.content, &registry);
+
+        // Extract internal/external links
+        let (internal, external) = resolve::extract_links(&page.content);
+        page.internal_links = internal;
+        page.external_links = external;
     }
 
-    // Build global label registry: label -> (slug, kind, title, number, content)
-    let registry: HashMap<String, (String, String, String, String, String)> = posts
-        .iter()
-        .zip(blocks_per_post.iter())
-        .flat_map(|(post, blocks)| {
-            blocks
-                .iter()
-                .map(|block| {
-                    (
-                        block.label.clone(),
-                        (
-                            post.slug.clone(),
-                            block.kind.clone(),
-                            block.title.clone(),
-                            block.number.clone(),
-                            block.content.clone(),
-                        ),
-                    )
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-
-    // Build alias map: label -> aliases
-    let alias_map: HashMap<String, Vec<String>> = blocks_per_post
-        .iter()
-        .flat_map(|blocks| blocks.iter().map(|b| (b.label.clone(), b.aliases.clone())))
-        .collect();
-
-    // Resolve cross-references in block preview content first
-    let mut resolved_registry = registry.clone();
-    for (_label, (_slug, _kind, _title, _number, content)) in resolved_registry.iter_mut() {
-        *content = resolve_cross_references_preview(content, &registry);
+    // ---- Remove the raw body from metadata (it's now in the IR) ----
+    for page in &mut pages {
+        page.metadata.remove("body");
     }
 
-    // Resolve explicit [[label]] cross-references in post bodies
-    for post in &mut posts {
-        post.body = resolve_cross_references(&post.body, &post.slug, &resolved_registry);
+    // ---- Generate table of contents for pages that want it ----
+    for page in &mut pages {
+        let has_toc = page.metadata.get("toc").is_some_and(|v| v == "true");
+        if has_toc {
+            let toc = generate_toc(&page.content);
+            if !toc.is_empty() {
+                page.content.insert(0, Block::TableOfContents(toc));
+            }
+        }
     }
 
-    // Auto-link defined terms in prose (after explicit xrefs are resolved)
-    let term_index = build_term_index(&resolved_registry, &alias_map);
-    for post in &mut posts {
-        post.body = auto_link_definitions(&post.body, &post.slug, &term_index, &resolved_registry);
-    }
+    // ---- Serialize with postcard ----
+    let site_data = SiteData { pages };
+    let bytes = postcard::to_allocvec(&site_data).expect("failed to serialize SiteData");
 
-    // Re-extract links since cross-refs and auto-links may add internal links
-    for post in &mut posts {
-        post.internal_links = extract_internal_links(&post.body);
-        post.external_links = extract_external_links(&post.body);
-    }
+    // ---- Emit the bytes as a static array ----
+    let byte_literals: Vec<proc_macro2::TokenStream> = bytes.iter().map(|b| quote! { #b }).collect();
+    let len = bytes.len();
 
-    // Sort by date descending
-    posts.sort_by(|a, b| b.date().cmp(a.date()));
-
-    // Filter out drafts in release mode; keep them in dev mode
-    #[cfg(not(debug_assertions))]
-    posts.retain(|post| !post.is_draft());
-
-    let post_tokens = posts
-        .iter()
-        .zip(blocks_per_post.iter())
-        .map(|(post, blocks)| emit_post_tokens(post, blocks));
+    // ---- Also emit rerun-if-changed directives ----
+    let _content_path = content_dir.display().to_string();
 
     let output = quote! {
-        &[#(#post_tokens),*]
+        {
+            const _RERUN: &str = concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/content/posts",
+            );
+            pub static SITE_BYTES: &[u8; #len] = &[#(#byte_literals),*];
+            SITE_BYTES
+        }
     };
 
     return output.into();
 }
 
 // ============================================================
-// Token emission
+// File reading
 // ============================================================
 
-fn emit_post_tokens(post: &ParsedPost, blocks: &[LabeledBlock]) -> proc_macro2::TokenStream {
-    let slug = &post.slug;
-    let folder = &post.folder;
-    let body = &post.body;
-
-    let metadata_entries = post.metadata.iter().map(|(key, value)| {
-        quote! { (#key, #value) }
-    });
-
-    let internal_link_entries = post.internal_links.iter().map(|link| {
-        quote! { #link }
-    });
-
-    let external_link_entries = post.external_links.iter().map(|link| {
-        quote! { #link }
-    });
-
-    let source_entries: Vec<String> = post.sources().iter().map(|s| s.to_string()).collect();
-    let source_tokens = source_entries.iter().map(|source| {
-        quote! { #source }
-    });
-
-    let block_tokens = blocks.iter().map(|block| {
-        let label = &block.label;
-        let kind = &block.kind;
-        let title = &block.title;
-        let number = &block.number;
-        let content = &block.content;
-
-        quote! {
-            LabeledBlock {
-                label: #label,
-                kind: #kind,
-                title: #title,
-                number: #number,
-                content: #content,
-            }
-        }
-    });
-
-    return quote! {
-        Post {
-            slug: #slug,
-            folder: #folder,
-            metadata: &[#(#metadata_entries),*],
-            body: #body,
-            internal_links: &[#(#internal_link_entries),*],
-            external_links: &[#(#external_link_entries),*],
-            sources: &[#(#source_tokens),*],
-            labeled_blocks: &[#(#block_tokens),*],
-        }
-    };
+fn content_dir() -> PathBuf {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    return PathBuf::from(manifest_dir).join("content");
 }
 
-// ============================================================
-// Labeled blocks (```kind Title {#label} ... ```)
-// ============================================================
+fn read_posts(posts_dir: &PathBuf) -> Vec<Page> {
+    let mut pages = Vec::new();
 
-fn extract_labeled_blocks(body: &str, has_toc: bool) -> (String, Vec<LabeledBlock>) {
-    let all_kinds: Vec<&str> = NUMBERED_KINDS
-        .iter()
-        .chain(UNNUMBERED_KINDS.iter())
-        .chain(CALLOUT_KINDS.iter())
-        .copied()
-        .collect();
-    let mut blocks = Vec::new();
-    let mut result = String::new();
-    let mut global_counter: u32 = 0;
-    let mut section_counter: u32 = 0;
-    let mut section: [u32; 3] = [0, 0, 0]; // h1, h2, h3 counters for chapter-scoped numbering
-    let lines: Vec<&str> = body.lines().collect();
-    let mut i = 0;
+    if !posts_dir.exists() {
+        return pages;
+    }
 
-    while i < lines.len() {
-        let trimmed = lines[i].trim();
+    collect_markdown_files(posts_dir, posts_dir, &mut pages);
+    pages.sort_by(|a, b| a.slug.cmp(&b.slug));
+    return pages;
+}
 
-        // Track heading levels for chapter-scoped numbering
-        if has_toc && trimmed.starts_with('#') {
-            let level = trimmed.chars().take_while(|&c| c == '#').count();
-            if (1..=3).contains(&level) {
-                let idx = level - 1;
-                section[idx] += 1;
-                for s in &mut section[idx + 1..] {
-                    *s = 0;
-                }
-                section_counter = 0;
-            }
-        }
-
-        // Check for backtick-fenced block: ```kind or ````kind etc.
-        if let Some((fence_len, rest)) = parse_backtick_fence(trimmed)
-            && let Some((kind, title, aliases, label_opt)) = parse_block_header(rest)
-            && all_kinds.contains(&kind.as_str())
+fn collect_markdown_files(base: &PathBuf, dir: &PathBuf, pages: &mut Vec<Page>) {
+    let entries = fs::read_dir(dir).unwrap_or_else(|e| panic!("failed to read dir {}: {e}", dir.display()));
+    for entry in entries {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_dir() {
+            collect_markdown_files(base, &path, pages);
+        } else if path.extension().is_some_and(|ext| ext == "md")
+            && let Some(page) = read_single_post(base, &path)
         {
-            let is_callout = CALLOUT_KINDS.contains(&kind.as_str());
-            let is_numbered = NUMBERED_KINDS.contains(&kind.as_str());
-            let number = if is_numbered {
-                if has_toc && section[0] > 0 {
-                    section_counter += 1;
-                    // Build section-scoped number like "1.1", "1.2.1"
-                    let depth = if section[2] > 0 {
-                        3
-                    } else if section[1] > 0 {
-                        2
-                    } else {
-                        1
-                    };
-                    let mut parts: Vec<String> = section[..depth].iter().map(|n| n.to_string()).collect();
-                    parts.push(section_counter.to_string());
-                    parts.join(".")
-                } else {
-                    global_counter += 1;
-                    global_counter.to_string()
-                }
-            } else {
-                String::new()
-            };
-
-            let label = label_opt.unwrap_or_else(|| {
-                if is_numbered {
-                    format!("{}-{}", kind, number)
-                } else {
-                    format!("{}-{}", kind, blocks.len())
-                }
-            });
-
-            // Collect content until matching closing fence (same or more backticks)
-            i += 1;
-            let mut content = String::new();
-            while i < lines.len() {
-                let line_trimmed = lines[i].trim();
-                if is_closing_fence(line_trimmed, fence_len) {
-                    break;
-                }
-                if !content.is_empty() {
-                    content.push('\n');
-                }
-                content.push_str(lines[i]);
-                i += 1;
-            }
-            let content = content.trim().to_string();
-
-            if is_callout {
-                // Emit callout HTML directly
-                result.push_str(&format!(
-                    "<div class=\"callout callout-{kind}\">\n<div class=\"callout-title\">{}</div>\n<div \
-                     class=\"callout-body\">\n\n{content}\n\n</div>\n</div>\n",
-                    capitalize_first(&kind)
-                ));
-            } else {
-                blocks.push(LabeledBlock {
-                    label: label.clone(),
-                    kind: kind.clone(),
-                    title: title.clone(),
-                    aliases,
-                    number: number.clone(),
-                    content: content.clone(),
-                });
-
-                // Emit HTML comment markers (pulldown-cmark passes these through)
-                let html_id = label.replace(':', "-");
-                let escaped_title = title.replace('|', "\\|");
-                result.push_str(&format!(
-                    "<!--BLOCK|{}|{}|{}|{}-->\n\n{}\n\n<!--/BLOCK-->\n",
-                    kind, html_id, number, escaped_title, content
-                ));
-            }
-
-            i += 1; // skip closing fence
-            continue;
+            pages.push(page);
         }
-
-        result.push_str(lines[i]);
-        result.push('\n');
-        i += 1;
     }
-
-    return (result, blocks);
 }
 
-/// Parse a backtick fence opening line. Returns (fence_length, rest_after_backticks) if the line
-/// starts with 3+ backticks followed by a non-empty "language" tag.
-fn parse_backtick_fence(line: &str) -> Option<(usize, &str)> {
-    let backtick_count = line.chars().take_while(|&c| c == '`').count();
-    if backtick_count < 3 {
+fn read_single_post(base: &PathBuf, path: &PathBuf) -> Option<Page> {
+    let content = fs::read_to_string(path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+
+    // Parse YAML frontmatter
+    let (metadata, body) = parse_frontmatter(&content);
+
+    // Determine slug from path
+    let relative = path.strip_prefix(base).unwrap().with_extension("");
+    let slug = relative.to_str().unwrap().replace('\\', "/");
+
+    // Determine folder
+    let folder = relative
+        .parent()
+        .map(|p| p.to_str().unwrap_or(""))
+        .unwrap_or("")
+        .replace('\\', "/");
+
+    // Check for draft
+    if metadata.get("draft").is_some_and(|v| v == "true") {
         return None;
     }
-    let rest = line[backtick_count..].trim();
-    if rest.is_empty() {
-        return None;
-    }
-    return Some((backtick_count, rest));
-}
 
-/// Check if a line is a closing fence with at least `min_len` backticks and nothing else.
-fn is_closing_fence(line: &str, min_len: usize) -> bool {
-    let backtick_count = line.chars().take_while(|&c| c == '`').count();
-    return backtick_count >= min_len && line[backtick_count..].trim().is_empty();
-}
+    let mut meta = metadata;
+    meta.insert("body".to_string(), body);
 
-/// Parse `kind Title | alias1, alias2 {#label}` from the text after backticks.
-/// Returns (kind, title, aliases, optional_label).
-fn parse_block_header(header: &str) -> Option<(String, String, Vec<String>, Option<String>)> {
-    let kind_end = header.find(|c: char| c.is_whitespace()).unwrap_or(header.len());
-    let kind = header[..kind_end].to_lowercase();
-    let after_kind = header[kind_end..].trim();
-
-    let (title_and_aliases, label) = if let Some(label_start) = after_kind.rfind("{#") {
-        let after = &after_kind[label_start + 2..];
-        if let Some(label_end) = after.find('}') {
-            let l = after[..label_end].to_string();
-            let before = after_kind[..label_start].trim().to_string();
-            (before, Some(l))
-        } else {
-            (after_kind.to_string(), None)
-        }
-    } else {
-        (after_kind.to_string(), None)
-    };
-
-    // Split title from aliases on `|`
-    let (title, aliases) = if let Some(pipe_pos) = title_and_aliases.find('|') {
-        let title = title_and_aliases[..pipe_pos].trim().to_string();
-        let alias_str = &title_and_aliases[pipe_pos + 1..];
-        let aliases: Vec<String> = alias_str
-            .split(',')
-            .map(|a| a.trim().to_string())
-            .filter(|a| !a.is_empty())
-            .collect();
-        (title, aliases)
-    } else {
-        (title_and_aliases, Vec::new())
-    };
-
-    return Some((kind, title, aliases, label));
+    return Some(Page {
+        slug,
+        folder,
+        metadata: meta,
+        content: Vec::new(),
+        blocks: Vec::new(),
+        citations: Vec::new(),
+        internal_links: Vec::new(),
+        external_links: Vec::new(),
+        sources: Vec::new(),
+    });
 }
 
 // ============================================================
-// Cross-reference resolution ([[label]] → HTML links)
+// Table of contents generation
 // ============================================================
 
-fn resolve_cross_references(
-    body: &str,
-    current_slug: &str,
-    registry: &HashMap<String, (String, String, String, String, String)>,
-) -> String {
-    // Process line by line to skip fenced code blocks
-    let mut result = String::new();
-    let mut in_code_block = false;
-    let mut code_fence_len: usize = 0;
-
-    for line in body.lines() {
-        let trimmed = line.trim();
-        let backtick_count = trimmed.chars().take_while(|&c| c == '`').count();
-
-        if in_code_block {
-            if backtick_count >= code_fence_len && trimmed[backtick_count..].trim().is_empty() {
-                in_code_block = false;
-            }
-            result.push_str(line);
-            result.push('\n');
-            continue;
-        }
-
-        if backtick_count >= 3 && !trimmed[backtick_count..].trim().is_empty() {
-            in_code_block = true;
-            code_fence_len = backtick_count;
-            result.push_str(line);
-            result.push('\n');
-            continue;
-        }
-
-        // Also skip closing fences (```\n without info string)
-        if backtick_count >= 3 && trimmed[backtick_count..].trim().is_empty() && trimmed.len() == backtick_count {
-            result.push_str(line);
-            result.push('\n');
-            continue;
-        }
-
-        // Process cross-references only in non-code lines
-        let resolved = resolve_cross_references_line(line, current_slug, registry);
-        result.push_str(&resolved);
-        result.push('\n');
-    }
-
-    // Remove trailing newline if original didn't have one
-    if !body.ends_with('\n') && result.ends_with('\n') {
-        result.pop();
-    }
-
-    return result;
-}
-
-fn resolve_cross_references_line(
-    line: &str,
-    current_slug: &str,
-    registry: &HashMap<String, (String, String, String, String, String)>,
-) -> String {
-    let mut result = String::new();
-    let mut remaining = line;
-
-    while let Some(start) = remaining.find("[[") {
-        // Skip if inside inline code
-        let before = &remaining[..start];
-        let backtick_count = before.chars().filter(|&c| c == '`').count();
-        if backtick_count % 2 == 1 {
-            // Inside inline code — don't process
-            result.push_str(&remaining[..start + 2]);
-            remaining = &remaining[start + 2..];
-            continue;
-        }
-
-        // Skip transclusion markers ![[
-        if start > 0 && remaining.as_bytes()[start - 1] == b'!' {
-            result.push_str(&remaining[..start + 2]);
-            remaining = &remaining[start + 2..];
-            continue;
-        }
-
-        result.push_str(before);
-        let after = &remaining[start + 2..];
-
-        if let Some(end) = after.find("]]") {
-            let ref_content = &after[..end];
-
-            let (ref_key, custom_display) = if let Some(pipe) = ref_content.find('|') {
-                (&ref_content[..pipe], Some(&ref_content[pipe + 1..]))
-            } else {
-                (ref_content, None)
-            };
-
-            // Support [[slug#label]] for cross-post references
-            let (target_slug_override, label) = if let Some(hash) = ref_key.find('#') {
-                (Some(&ref_key[..hash]), &ref_key[hash + 1..])
-            } else {
-                (None, ref_key)
-            };
-
-            if let Some((slug, kind, title, number, content)) = registry.get(label) {
-                let effective_slug = target_slug_override.unwrap_or(slug.as_str());
-                let display_text = if let Some(custom) = custom_display {
-                    custom.to_string()
-                } else {
-                    default_xref_display(kind, title, number)
-                };
-                result.push_str(&block_anchor(
-                    "xref",
-                    label,
-                    kind,
-                    title,
-                    number,
-                    content,
-                    effective_slug,
-                    current_slug,
-                    &display_text,
-                ));
-            } else {
-                // Unknown reference — leave the original text, don't create broken span
-                result.push_str(&format!("[[{ref_content}]]"));
-            }
-
-            remaining = &after[end + 2..];
-        } else {
-            result.push_str("[[");
-            remaining = after;
-        }
-    }
-    result.push_str(remaining);
-
-    return result;
-}
-
-fn resolve_cross_references_preview(
-    content: &str,
-    registry: &HashMap<String, (String, String, String, String, String)>,
-) -> String {
-    let mut result = String::new();
-    let mut remaining = content;
-
-    while let Some(start) = remaining.find("[[") {
-        result.push_str(&remaining[..start]);
-        let after = &remaining[start + 2..];
-
-        if let Some(end) = after.find("]]") {
-            let ref_content = &after[..end];
-            let (label, custom_display) = if let Some(pipe) = ref_content.find('|') {
-                (&ref_content[..pipe], Some(&ref_content[pipe + 1..]))
-            } else {
-                (ref_content, None)
-            };
-
-            if let Some((_slug, kind, title, number, _content)) = registry.get(label) {
-                let display = if let Some(custom) = custom_display {
-                    custom.to_string()
-                } else {
-                    default_xref_display(kind, title, number)
-                };
-                result.push_str(&display);
-            } else {
-                result.push_str(ref_content);
-            }
-            remaining = &after[end + 2..];
-        } else {
-            result.push_str("[[");
-            remaining = after;
-        }
-    }
-    result.push_str(remaining);
-    return result;
-}
-
-// ============================================================
-// Auto-definition linking
-// ============================================================
-
-/// A term from the definition registry that can be auto-linked in prose.
-struct TermEntry {
-    title_lower: String,
-    label: String,
-    slug: String,
-    kind: String,
-    title: String,
-    number: String,
-    preview: String,
-}
-
-/// Build a sorted index of linkable terms from the registry.
-/// Terms are sorted longest-first so "normal subgroup" matches before "subgroup".
-/// Includes extra entries for definition aliases.
-fn build_term_index(
-    registry: &HashMap<String, (String, String, String, String, String)>,
-    alias_map: &HashMap<String, Vec<String>>,
-) -> Vec<TermEntry> {
-    let mut terms: Vec<TermEntry> = registry
-        .iter()
-        .filter(|(_, (_, kind, title, _, _))| !title.is_empty() && kind != "proof" && kind != "example")
-        .flat_map(|(label, (slug, kind, title, number, content))| {
-            let preview = escape_for_attribute(content);
-            let title_lower = title.to_lowercase();
-            let mut entries = vec![TermEntry {
-                title_lower: title_lower.clone(),
-                label: label.clone(),
-                slug: slug.clone(),
-                kind: kind.clone(),
-                title: title.clone(),
+fn generate_toc(content: &[Block]) -> Vec<TocEntry> {
+    let mut toc = Vec::new();
+    for block in content {
+        if let Block::Heading {
+            level,
+            id,
+            number,
+            children,
+        } = block
+        {
+            toc.push(TocEntry {
+                level: *level,
+                id: id.clone(),
+                title: ir::parse::inlines_to_plain_text(children),
                 number: number.clone(),
-                preview: preview.clone(),
-            }];
-
-            // Add automatic plural as alias
-            let plural = if title_lower.ends_with('s')
-                || title_lower.ends_with('x')
-                || title_lower.ends_with('z')
-                || title_lower.ends_with("ch")
-                || title_lower.ends_with("sh")
-            {
-                format!("{}es", title_lower)
-            } else {
-                format!("{}s", title_lower)
-            };
-            entries.push(TermEntry {
-                title_lower: plural,
-                label: label.clone(),
-                slug: slug.clone(),
-                kind: kind.clone(),
-                title: format!("{}s", title),
-                number: number.clone(),
-                preview: preview.clone(),
             });
-
-            // Add alias entries that link to the same definition
-            if let Some(aliases) = alias_map.get(label) {
-                for alias in aliases {
-                    entries.push(TermEntry {
-                        title_lower: alias.to_lowercase(),
-                        label: label.clone(),
-                        slug: slug.clone(),
-                        kind: kind.clone(),
-                        title: alias.clone(),
-                        number: number.clone(),
-                        preview: preview.clone(),
-                    });
-                }
-            }
-
-            entries
-        })
-        .collect();
-
-    // Sort longest first — greedy matching prevents "subgroup" from eating "normal subgroup"
-    terms.sort_by_key(|t| std::cmp::Reverse(t.title_lower.len()));
-    return terms;
-}
-
-/// Auto-link defined terms in a post's body text.
-/// Every occurrence of each term per post is linked.
-/// Skips: HTML tags, comments, inline code, math, fenced code blocks, and existing xref/auto-def spans.
-fn auto_link_definitions(
-    body: &str,
-    current_slug: &str,
-    terms: &[TermEntry],
-    _registry: &HashMap<String, (String, String, String, String, String)>,
-) -> String {
-    if terms.is_empty() {
-        return body.to_string();
-    }
-
-    // Build a set of byte ranges that are inside fenced code blocks
-    let code_block_ranges = find_fenced_code_ranges(body);
-
-    let body_lower = body.to_lowercase();
-    let mut result = String::new();
-    let mut pos = 0;
-
-    while pos < body.len() {
-        // Skip fenced code block regions entirely
-        if let Some(range) = code_block_ranges.iter().find(|(start, _)| *start == pos) {
-            result.push_str(&body[range.0..range.1]);
-            pos = range.1;
-            continue;
-        }
-        // If we're inside a code block range, skip character by character until we exit
-        if code_block_ranges.iter().any(|(start, end)| pos > *start && pos < *end) {
-            let ch = body[pos..].chars().next().unwrap();
-            result.push(ch);
-            pos += ch.len_utf8();
-            continue;
-        }
-
-        // Try to skip opaque regions (HTML tags, comments, code, math)
-        if let Some(skip) = skip_opaque_region(body, pos) {
-            result.push_str(&body[pos..pos + skip]);
-            pos += skip;
-            continue;
-        }
-
-        // Check if current position is a word boundary (start of a potential term)
-        if is_word_start(body, pos) {
-            // Find the longest matching term at this position
-            let mut best_match: Option<(usize, &TermEntry)> = None;
-
-            for term in terms {
-                let end = pos + term.title_lower.len();
-                if end > body.len() {
-                    continue;
-                }
-                if end > body_lower.len() || !body_lower.is_char_boundary(end) || !body.is_char_boundary(end) {
-                    continue;
-                }
-                if body_lower[pos..end] == term.title_lower && is_word_end(body, end) {
-                    // Keep track of the longest match
-                    if best_match.is_none() || end > best_match.unwrap().0 {
-                        best_match = Some((end, term));
-                    }
-                }
-            }
-
-            if let Some((end, term)) = best_match {
-                let original = &body[pos..end];
-                let kind_class = match term.kind.as_str() {
-                    "definition" => "auto-def",
-                    "theorem" | "lemma" | "corollary" | "proposition" => "auto-thm",
-                    _ => "auto-def",
-                };
-                result.push_str(&block_anchor(
-                    kind_class,
-                    &term.label,
-                    &term.kind,
-                    &term.title,
-                    &term.number,
-                    &term.preview,
-                    &term.slug,
-                    current_slug,
-                    original,
-                ));
-                pos = end;
-            } else {
-                // Advance one character (handle multi-byte UTF-8)
-                let ch = body[pos..].chars().next().unwrap();
-                result.push(ch);
-                pos += ch.len_utf8();
-            }
-        } else {
-            // Advance one character (handle multi-byte UTF-8)
-            let ch = body[pos..].chars().next().unwrap();
-            result.push(ch);
-            pos += ch.len_utf8();
         }
     }
-
-    return result;
-}
-
-/// Find byte ranges of fenced code blocks (``` ... ```) in the body.
-/// Returns a vec of (start_byte, end_byte) pairs.
-fn find_fenced_code_ranges(body: &str) -> Vec<(usize, usize)> {
-    let mut ranges = Vec::new();
-    let mut in_code = false;
-    let mut fence_len = 0usize;
-    let mut block_start = 0usize;
-    let mut line_start = 0usize;
-
-    for line in body.lines() {
-        let trimmed = line.trim();
-        let backticks = trimmed.chars().take_while(|&c| c == '`').count();
-
-        if in_code {
-            if backticks >= fence_len && trimmed[backticks..].trim().is_empty() {
-                // End of code block — include the closing fence
-                let line_end = line_start + line.len();
-                ranges.push((block_start, line_end));
-                in_code = false;
-            }
-        } else if backticks >= 3 && !trimmed[backticks..].trim().is_empty() {
-            // Opening fence with info string
-            in_code = true;
-            fence_len = backticks;
-            block_start = line_start;
-        }
-
-        line_start += line.len() + 1; // +1 for the newline
-    }
-
-    // Handle unclosed code block
-    if in_code {
-        ranges.push((block_start, body.len()));
-    }
-
-    return ranges;
-}
-
-/// Returns the length of an opaque region starting at `pos`, or None if not in one.
-fn skip_opaque_region(body: &str, pos: usize) -> Option<usize> {
-    let remaining = &body[pos..];
-
-    // HTML comments (block markers)
-    if remaining.starts_with("<!--") {
-        return remaining.find("-->").map(|end| end + 3);
-    }
-
-    // Any anchor tag: skip the entire <a ...>...</a> (links take precedence over auto-defs)
-    if (remaining.starts_with("<a ") || remaining.starts_with("<a>"))
-        && let Some(close) = remaining.find("</a>")
-    {
-        return Some(close + 4);
-    }
-
-    // Any other HTML tag (skip the tag itself, not its content)
-    if remaining.starts_with('<') && !remaining.starts_with("<!--") {
-        return remaining.find('>').map(|end| end + 1);
-    }
-
-    // Inline code (single backtick, not triple — fenced blocks handled separately)
-    if remaining.starts_with('`') && !remaining.starts_with("```") {
-        let after = &remaining[1..];
-        return after.find('`').map(|end| end + 2);
-    }
-
-    // Display math $$...$$
-    if let Some(after) = remaining.strip_prefix("$$") {
-        return after.find("$$").map(|end| end + 4);
-    }
-
-    // Inline math $...$
-    if remaining.starts_with('$') && remaining.len() > 1 && remaining.as_bytes()[1] != b'$' {
-        let after = &remaining[1..];
-        return after.find('$').map(|end| end + 2);
-    }
-
-    // Markdown links [text](url) — skip the entire link so auto-def doesn't break link text
-    if remaining.starts_with('[')
-        && !remaining.starts_with("[[")
-        && let Some(bracket_end) = remaining.find("](")
-        && let Some(paren_end) = remaining[bracket_end + 2..].find(')')
-    {
-        return Some(bracket_end + 2 + paren_end + 1);
-    }
-
-    return None;
-}
-
-/// Check if position is at a word boundary suitable for a term start.
-fn is_word_start(body: &str, pos: usize) -> bool {
-    if pos == 0 {
-        return true;
-    }
-    let prev = body[..pos].chars().next_back().unwrap();
-    return !prev.is_alphanumeric() && prev != '_';
-}
-
-/// Check if position is at a word boundary suitable for a term end.
-fn is_word_end(body: &str, pos: usize) -> bool {
-    if pos >= body.len() {
-        return true;
-    }
-    let next = body[pos..].chars().next().unwrap();
-    return !next.is_alphanumeric() && next != '_';
-}
-
-// ============================================================
-// Shared helpers
-// ============================================================
-
-/// Build an HTML anchor tag referencing a labeled block.
-#[allow(clippy::too_many_arguments)]
-fn block_anchor(
-    class: &str,
-    label: &str,
-    kind: &str,
-    title: &str,
-    number: &str,
-    preview: &str,
-    slug: &str,
-    current_slug: &str,
-    display_text: &str,
-) -> String {
-    let html_id = label.replace(':', "-");
-    let is_same_page = slug == current_slug;
-    let href = if is_same_page {
-        format!("#{html_id}")
-    } else {
-        format!("/blog/{slug}#{html_id}")
-    };
-    let target_attr = if is_same_page {
-        ""
-    } else {
-        " target=\"_blank\" rel=\"noopener\""
-    };
-    let escaped_preview = escape_for_attribute(preview);
-    let escaped_title = escape_for_attribute(title);
-    let escaped_label = escape_for_attribute(label);
-    return format!(
-        "<a class=\"{class}\" href=\"{href}\" data-preview=\"{escaped_preview}\" data-block-label=\"{escaped_label}\" \
-         data-block-kind=\"{kind}\" data-block-title=\"{escaped_title}\" \
-         data-block-number=\"{number}\"{target_attr}>{display_text}</a>"
-    );
-}
-
-fn escape_for_attribute(content: &str) -> String {
-    return content
-        .replace('&', "&amp;")
-        .replace('"', "&quot;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('\'', "&#39;")
-        .replace('\n', " ");
-}
-
-fn default_xref_display(kind: &str, title: &str, number: &str) -> String {
-    if !title.is_empty() {
-        return title.to_string();
-    }
-    let kind_display = capitalize_first(kind);
-    if !number.is_empty() {
-        format!("{kind_display} {number}")
-    } else {
-        kind_display
-    }
-}
-
-fn capitalize_first(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
-    }
+    return toc;
 }

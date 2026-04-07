@@ -2,6 +2,18 @@
 
 :root,
 [data-theme="light"] {
+  // ---- Typography scale ----
+  --font-xs: 0.7rem;
+  --font-sm: 0.75rem;
+  --font-base: 0.85rem;
+  --font-md: 0.9rem;
+  --font-lg: 1rem;
+  --font-xl: 1.1rem;
+  --font-h3: 1.1rem;
+  --font-h2: 1.25rem;
+  --font-h1: 1.4rem;
+
+  // ---- Colors ----
   --bg: #ffffff;
   --bg-alt: #f6f8fa;
   --text: #24292e;
@@ -30,6 +42,11 @@
   --code-punctuation: #24292e;
   --code-class: #6f42c1;
   --code-builtin: #005cc5;
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --overlay: rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] {
@@ -61,4 +78,9 @@
   --code-punctuation: #c9d1d9;
   --code-class: #f0883e;
   --code-builtin: #79c0ff;
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --overlay: rgba(0, 0, 0, 0.5);
 }

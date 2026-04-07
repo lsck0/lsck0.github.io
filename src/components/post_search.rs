@@ -1,10 +1,8 @@
-#![allow(clippy::needless_return)]
-
 use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;
 use wasm_bindgen::{JsCast, closure::Closure};
 
-use crate::models::{post::POSTS, search::fuzzy_score};
+use crate::models::{post::POSTS, search::score_post};
 
 // ============================================================
 // Component
@@ -282,14 +280,7 @@ pub fn GlobalSearch() -> impl IntoView {
         let mut scored: Vec<(usize, u32)> = POSTS
             .iter()
             .enumerate()
-            .filter_map(|(i, post)| {
-                let title_score = fuzzy_score(&q, post.title()).map(|s| s.saturating_mul(3));
-                let desc_score = fuzzy_score(&q, post.description());
-                let block_text = post.labeled_block_text();
-                let block_score = fuzzy_score(&q, &block_text).map(|s| s.saturating_mul(2));
-                let best = [title_score, desc_score, block_score].into_iter().flatten().max();
-                best.map(|score| (i, score))
-            })
+            .filter_map(|(i, post)| score_post(&q, post).map(|score| (i, score)))
             .collect();
         scored.sort_by_key(|e| std::cmp::Reverse(e.1));
         scored.truncate(10);
@@ -426,7 +417,7 @@ pub fn GlobalSearch() -> impl IntoView {
                                                         }
                                                     >
                                                         <span class="global-search-title">{post.title()}</span>
-                                                        <span class="global-search-slug">{post.slug}</span>
+                                                        <span class="global-search-slug">{post.slug()}</span>
                                                     </div>
                                                 }
                                             })

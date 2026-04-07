@@ -11,8 +11,9 @@ sources: https://en.wikipedia.org/wiki/Ring_(mathematics)
 
 This post builds on the group theory developed in [Groups](/blog/math/group-theory). The treatment follows Lang[^lang] and Atiyah & Macdonald[^am].
 
-[^lang]: Serge Lang, *Algebra*, 3rd ed., Springer, 2002.
-[^am]: Michael F. Atiyah & Ian G. Macdonald, *Introduction to Commutative Algebra*, Addison-Wesley, 1969.
+[^lang]: Serge Lang, _Algebra_, 3rd ed., Springer, 2002.
+
+[^am]: Michael F. Atiyah & Ian G. Macdonald, _Introduction to Commutative Algebra_, Addison-Wesley, 1969.
 
 ## Rings
 
@@ -25,7 +26,7 @@ A **ring** $(R, +, \cdot)$ is a set $R$ equipped with two binary operations such
 ```
 
 ```definition Commutative Ring {#def:commutative-ring}
-A [[def:ring]] $R$ is **commutative** if $ab = ba$ for all $a, b \in R$.
+A ring $R$ is **commutative** if $ab = ba$ for all $a, b \in R$.
 ```
 
 ```example {#ex:rings}
@@ -54,13 +55,13 @@ a(b + c) &= ab + ac && \text{(left distributivity)} \\
 
 The hierarchy of algebraic structures:
 
-| Structure | Addition | Multiplication |
-|---|---|---|
-| [[def:abelian-group]] | abelian group | — |
-| [[def:ring]] | abelian group | monoid + distributivity |
-| [[def:commutative-ring]] | abelian group | commutative monoid + dist. |
-| Integral domain | abelian group | comm. monoid + no zero divisors |
-| [[def:field]] | abelian group | abelian group (on $R \setminus \{0\}$) |
+| Structure                | Addition      | Multiplication                         |
+| ------------------------ | ------------- | -------------------------------------- |
+| [[def:abelian-group]]    | abelian group | —                                      |
+| [[def:ring]]             | abelian group | monoid + distributivity                |
+| [[def:commutative-ring]] | abelian group | commutative monoid + dist.             |
+| Integral domain          | abelian group | comm. monoid + no zero divisors        |
+| [[def:field]]            | abelian group | abelian group (on $R \setminus \{0\}$) |
 
 ```definition Zero Divisor {#def:zero-divisor}
 A nonzero element $a$ in a [[def:ring]] $R$ is a **zero divisor** if there exists a nonzero $b \in R$ with $ab = 0$ or $ba = 0$.

@@ -3,36 +3,31 @@ use leptos_router::components::A;
 
 use super::SidebarState;
 
+const MOBILE_BREAKPOINT: f64 = 768.0;
+
+fn is_mobile() -> bool {
+    web_sys::window()
+        .and_then(|w| w.inner_width().ok())
+        .and_then(|w| w.as_f64())
+        .is_some_and(|w| w <= MOBILE_BREAKPOINT)
+}
+
 #[component]
 pub fn Header() -> impl IntoView {
-    let sidebar_state = use_context::<SidebarState>();
+    let state = use_context::<SidebarState>().expect("SidebarState context");
 
     let toggle_sidebar = move |_| {
-        if let Some(state) = sidebar_state {
-            // On mobile, toggle the mobile overlay
-            // On desktop, toggle the desktop sidebar
-            let window = web_sys::window().unwrap();
-            let width = window.inner_width().unwrap().as_f64().unwrap_or(0.0);
-            if width <= 768.0 {
-                state.is_mobile_open.update(|is_open| *is_open = !*is_open);
-            } else {
-                state.is_desktop_open.update(|is_open| *is_open = !*is_open);
-            }
-        }
-    };
-
-    let is_open = move || {
-        if let Some(state) = sidebar_state {
-            state.is_mobile_open.get() || state.is_desktop_open.get()
+        if is_mobile() {
+            state.is_mobile_open.update(|open| *open = !*open);
         } else {
-            false
+            state.is_desktop_open.update(|open| *open = !*open);
         }
     };
 
     return view! {
         <header class="site-header">
             <button class="sidebar-toggle" on:click=toggle_sidebar title="Menu">
-                {move || if is_open() { "\u{2715}" } else { "\u{2630}" }}
+                "\u{2630}"
             </button>
             <A href="/" attr:class="nav-lambda">
                 {"\u{03bb}"}

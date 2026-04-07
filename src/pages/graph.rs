@@ -87,7 +87,7 @@ fn build_graph() -> (Vec<GraphNode>, Vec<GraphEdge>) {
             let angle = (index as f64) * 2.0 * std::f64::consts::PI / (POSTS.len() as f64);
             let radius = 200.0;
             GraphNode {
-                slug: post.slug.to_string(),
+                slug: post.slug().to_string(),
                 title: post.title().to_string(),
                 tags,
                 x: radius * angle.cos(),
@@ -101,8 +101,8 @@ fn build_graph() -> (Vec<GraphNode>, Vec<GraphEdge>) {
     let mut edges: Vec<GraphEdge> = Vec::new();
 
     for (source_index, post) in POSTS.iter().enumerate() {
-        for linked_slug in post.internal_links {
-            if let Some(target_index) = POSTS.iter().position(|post| post.slug == *linked_slug) {
+        for linked_slug in post.internal_links() {
+            if let Some(target_index) = POSTS.iter().position(|post| post.slug() == *linked_slug) {
                 edges.push(GraphEdge {
                     source: source_index,
                     target: target_index,
@@ -232,7 +232,7 @@ fn convex_hull(points: &[(f64, f64)]) -> Vec<(f64, f64)> {
     }
 
     let mut sorted: Vec<(f64, f64)> = points.to_vec();
-    sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then(a.1.partial_cmp(&b.1).unwrap()));
+    sorted.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
 
     let mut hull: Vec<(f64, f64)> = Vec::new();
 
@@ -359,8 +359,8 @@ fn draw_graph(
     ctx.fill_rect(0.0, 0.0, canvas_width, canvas_height);
 
     ctx.save();
-    ctx.translate(camera.offset_x, camera.offset_y).unwrap();
-    ctx.scale(camera.zoom, camera.zoom).unwrap();
+    let _ = ctx.translate(camera.offset_x, camera.offset_y);
+    let _ = ctx.scale(camera.zoom, camera.zoom);
 
     // ---- Tag regions ----
     let mut tag_points: HashMap<&str, Vec<(f64, f64)>> = HashMap::new();
@@ -401,9 +401,9 @@ fn draw_graph(
             &(6.0 / camera.zoom).into(),
             &(4.0 / camera.zoom).into(),
         ))
-        .unwrap();
+        .ok();
         ctx.stroke();
-        ctx.set_line_dash(&js_sys::Array::new()).unwrap();
+        let _ = ctx.set_line_dash(&js_sys::Array::new());
     }
 
     // ---- Edges ----
@@ -459,13 +459,13 @@ fn draw_graph(
                 &(8.0 / camera.zoom).into(),
                 &(4.0 / camera.zoom).into(),
             ))
-            .unwrap();
+            .ok();
         }
 
         draw_arrow(ctx, source.x, source.y, target.x, target.y, camera.zoom, NODE_RADIUS);
 
         if is_dashed {
-            ctx.set_line_dash(&js_sys::Array::new()).unwrap();
+            let _ = ctx.set_line_dash(&js_sys::Array::new());
         }
     }
 
@@ -501,8 +501,7 @@ fn draw_graph(
         }
 
         ctx.begin_path();
-        ctx.arc(node.x, node.y, radius, 0.0, 2.0 * std::f64::consts::PI)
-            .unwrap();
+        let _ = ctx.arc(node.x, node.y, radius, 0.0, 2.0 * std::f64::consts::PI);
         ctx.set_fill_style_str(&color);
         ctx.fill();
 
@@ -530,8 +529,7 @@ fn draw_graph(
         }
 
         ctx.set_text_align("center");
-        ctx.fill_text(&node.title, node.x, node.y - radius - 4.0 / camera.zoom)
-            .unwrap();
+        let _ = ctx.fill_text(&node.title, node.x, node.y - radius - 4.0 / camera.zoom);
     }
 
     ctx.restore();
@@ -564,7 +562,7 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
         };
         let canvas: HtmlCanvasElement = canvas_element;
 
-        let window = web_sys::window().unwrap();
+        let Some(window) = web_sys::window() else { return };
         let dpr = window.device_pixel_ratio();
 
         let rect = canvas.get_bounding_client_rect();
@@ -573,20 +571,19 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
         canvas.set_width((display_width * dpr) as u32);
         canvas.set_height((display_height * dpr) as u32);
 
-        let ctx: CanvasRenderingContext2d = canvas.get_context("2d").unwrap().unwrap().dyn_into().unwrap();
-        ctx.scale(dpr, dpr).unwrap();
+        let Ok(Some(ctx_obj)) = canvas.get_context("2d") else {
+            return;
+        };
+        let Ok(ctx) = ctx_obj.dyn_into::<CanvasRenderingContext2d>() else {
+            return;
+        };
+        let _ = ctx.scale(dpr, dpr);
 
         let (mut nodes, edges) = build_graph();
 
-        // Run simulation ahead of time so the graph starts in a stable layout
-        for _ in 0..2500 {
-            if !simulation_step(&mut nodes, &edges) {
-                break;
-            }
-        }
-        for node in &mut nodes {
-            node.velocity_x = 0.0;
-            node.velocity_y = 0.0;
+        // run partial simulation so the layout is roughly formed but still settles visually
+        for _ in 0..150 {
+            simulation_step(&mut nodes, &edges);
         }
 
         let nodes = Rc::new(RefCell::new(nodes));
@@ -661,10 +658,10 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
             );
 
             if has_movement || dragged_ref.is_some() {
-                if let Some(closure) = animation_ref.borrow().as_ref() {
-                    let _ = web_sys::window()
-                        .unwrap()
-                        .request_animation_frame(closure.as_ref().unchecked_ref());
+                if let Some(closure) = animation_ref.borrow().as_ref()
+                    && let Some(w) = web_sys::window()
+                {
+                    let _ = w.request_animation_frame(closure.as_ref().unchecked_ref());
                 }
             } else {
                 *is_animating_ref.borrow_mut() = false;
@@ -677,10 +674,10 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
             move || {
                 if !*is_animating.borrow() {
                     *is_animating.borrow_mut() = true;
-                    if let Some(closure) = animation.borrow().as_ref() {
-                        let _ = web_sys::window()
-                            .unwrap()
-                            .request_animation_frame(closure.as_ref().unchecked_ref());
+                    if let Some(closure) = animation.borrow().as_ref()
+                        && let Some(w) = web_sys::window()
+                    {
+                        let _ = w.request_animation_frame(closure.as_ref().unchecked_ref());
                     }
                 }
             }
@@ -745,15 +742,12 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
                         move_restart();
                     }
                     let element: &web_sys::HtmlElement = move_canvas.unchecked_ref();
-                    element
+                    let _ = element
                         .style()
-                        .set_property("cursor", if found.is_some() { "pointer" } else { "grab" })
-                        .unwrap();
+                        .set_property("cursor", if found.is_some() { "pointer" } else { "grab" });
                 }
             });
-            canvas
-                .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())
-                .unwrap();
+            let _ = canvas.add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref());
             closure.forget();
         }
 
@@ -781,12 +775,10 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
                 *down_dragged.borrow_mut() = find_node_at(&down_nodes.borrow(), &camera_ref, screen_x, screen_y);
 
                 let element: &web_sys::HtmlElement = down_canvas.unchecked_ref();
-                element.style().set_property("cursor", "grabbing").unwrap();
+                let _ = element.style().set_property("cursor", "grabbing");
                 down_restart();
             });
-            canvas
-                .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())
-                .unwrap();
+            let _ = canvas.add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref());
             closure.forget();
         }
 
@@ -821,11 +813,9 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
                 }
 
                 let element: &web_sys::HtmlElement = up_canvas.unchecked_ref();
-                element.style().set_property("cursor", "grab").unwrap();
+                let _ = element.style().set_property("cursor", "grab");
             });
-            canvas
-                .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())
-                .unwrap();
+            let _ = canvas.add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref());
             closure.forget();
         }
 
@@ -852,13 +842,11 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
             });
             let opts = web_sys::AddEventListenerOptions::new();
             opts.set_passive(false);
-            canvas
-                .add_event_listener_with_callback_and_add_event_listener_options(
-                    "wheel",
-                    closure.as_ref().unchecked_ref(),
-                    &opts,
-                )
-                .unwrap();
+            let _ = canvas.add_event_listener_with_callback_and_add_event_listener_options(
+                "wheel",
+                closure.as_ref().unchecked_ref(),
+                &opts,
+            );
             closure.forget();
         }
 
@@ -878,53 +866,8 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
         <div class="graph-container">
             <div class="graph-controls">
                 <span class="graph-hint">"drag to pan · scroll to zoom · click to open"</span>
-                <div class="graph-legend">{render_legend()}</div>
             </div>
             <canvas node_ref=canvas_ref class="graph-canvas" />
         </div>
     };
-}
-
-// ============================================================
-// Legend
-// ============================================================
-
-fn render_legend() -> impl IntoView {
-    let mut tag_counts: HashMap<&str, usize> = HashMap::new();
-    for post in POSTS {
-        for tag in post.tags() {
-            *tag_counts.entry(tag).or_default() += 1;
-        }
-    }
-    let mut tags: Vec<&str> = tag_counts.keys().copied().collect();
-    tags.sort_by(|a, b| tag_counts[b].cmp(&tag_counts[a]));
-
-    let tag_items = tags
-        .into_iter()
-        .map(|tag| {
-            let color = tag_color(tag);
-            view! {
-                <span class="legend-item">
-                    <span class="legend-dot" style:background=color />
-                    {tag}
-                </span>
-            }
-        })
-        .collect_view();
-
-    let edge_items = view! {
-        <span class="legend-item">
-            <span class="legend-line legend-line-solid" />
-            "reference"
-        </span>
-        <span class="legend-item">
-            <span class="legend-line legend-line-dashed" />
-            "series"
-        </span>
-    };
-
-    view! {
-        <div class="legend-tags">{tag_items}</div>
-        <div class="legend-edges">{edge_items}</div>
-    }
 }

@@ -1,3 +1,25 @@
+// Shared KaTeX config — macros are injected from content/macros.tex at compile time.
+var KATEX_DELIMITERS = [
+  { left: "$$", right: "$$", display: true },
+  { left: "$", right: "$", display: false },
+  { left: "\\(", right: "\\)", display: false },
+  { left: "\\[", right: "\\]", display: true },
+  { left: "\\begin{align}", right: "\\end{align}", display: true },
+  { left: "\\begin{align*}", right: "\\end{align*}", display: true },
+  { left: "\\begin{equation}", right: "\\end{equation}", display: true },
+  { left: "\\begin{equation*}", right: "\\end{equation*}", display: true },
+  { left: "\\begin{gather}", right: "\\end{gather}", display: true },
+  { left: "\\begin{gather*}", right: "\\end{gather*}", display: true },
+];
+
+function katexOpts(delimiters) {
+  return {
+    delimiters: delimiters,
+    macros: window.KATEX_MACROS || {},
+    throwOnError: false,
+  };
+}
+
 function renderPost() {
   requestAnimationFrame(function () {
     var el = document.getElementById("post-content");
@@ -6,15 +28,7 @@ function renderPost() {
       var listingEl = document.getElementById("listing-content");
       if (listingEl) {
         if (window.renderMathInElement) {
-          renderMathInElement(listingEl, {
-            delimiters: [
-              { left: "$$", right: "$$", display: true },
-              { left: "$", right: "$", display: false },
-              { left: "\\(", right: "\\)", display: false },
-              { left: "\\[", right: "\\]", display: true },
-            ],
-            throwOnError: false,
-          });
+          renderMathInElement(listingEl, katexOpts(KATEX_DELIMITERS));
         }
         setupTooltips(listingEl);
         setupMediaEmbeds(listingEl);
@@ -53,15 +67,7 @@ function renderPost() {
 
     // ---- KaTeX math rendering ----
     if (window.renderMathInElement) {
-      renderMathInElement(el, {
-        delimiters: [
-          { left: "$$", right: "$$", display: true },
-          { left: "$", right: "$", display: false },
-          { left: "\\(", right: "\\)", display: false },
-          { left: "\\[", right: "\\]", display: true },
-        ],
-        throwOnError: false,
-      });
+      renderMathInElement(el, katexOpts(KATEX_DELIMITERS));
       addSearchText(el.querySelectorAll(".math-inline[data-latex], .math-display[data-latex]"));
     }
 
@@ -103,8 +109,9 @@ function renderPost() {
     // ---- Pin buttons on labeled blocks ----
     setupBlockPinButtons(el);
 
-    // ---- Footnote repositioning (sidenotes on desktop) ----
+    // ---- Footnote + citation sidenotes on desktop ----
     repositionFootnotes(el);
+    repositionCitations(el);
 
     // ---- Hover preview tooltips (unified) ----
     setupTooltips(el);
@@ -201,13 +208,25 @@ function pollTikzSize(el) {
 // ============================================================
 
 function repositionFootnotes(el) {
+  // Guard: only run once per render
+  if (el.querySelector(".footnotes-section")) return;
+
+  // find insert point: before references, or before giscus, or at end of .content
+  function findInsertPoint(container) {
+    var refs = container.querySelector(".post-references");
+    if (refs) return refs;
+    var giscus = container.querySelector(".giscus-container");
+    if (giscus) return giscus;
+    return null;
+  }
+
   if (window.innerWidth < 1200) {
     // On mobile: move all footnotes to before the references section
     var footnotes = Array.from(el.querySelectorAll(".footnote-definition"));
     if (footnotes.length === 0) return;
 
     var content = el;
-    var referencesSection = content.querySelector(".post-references");
+    var insertPoint = findInsertPoint(content);
     var footnotesContainer = document.createElement("div");
     footnotesContainer.className = "footnotes-section";
 
@@ -220,13 +239,57 @@ function repositionFootnotes(el) {
       footnotesContainer.appendChild(footnote);
     });
 
-    if (referencesSection) {
-      content.insertBefore(footnotesContainer, referencesSection);
+    if (insertPoint) {
+      content.insertBefore(footnotesContainer, insertPoint);
     } else {
-      content.appendChild(footnotesContainer);
+      // fallback: append to .content div if it exists
+      var contentDiv = content.querySelector(".content");
+      if (contentDiv) {
+        contentDiv.appendChild(footnotesContainer);
+      } else {
+        content.appendChild(footnotesContainer);
+      }
     }
   } else {
-    // On desktop: move footnotes to sidebar as before
+    // On desktop: show footnotes both as sidenotes and in a bottom section
+    var footnotes = Array.from(el.querySelectorAll(".footnote-definition"));
+    if (footnotes.length === 0) return;
+
+    var content = el;
+    var insertPoint = findInsertPoint(content);
+
+    // 1. Build bottom section with clones (before moving originals)
+    var footnotesContainer = document.createElement("div");
+    footnotesContainer.className = "footnotes-section";
+    var header = document.createElement("h2");
+    header.textContent = "Footnotes";
+    footnotesContainer.appendChild(header);
+
+    footnotes.forEach(function (footnote) {
+      var clone = footnote.cloneNode(true);
+      clone.id = clone.id ? clone.id + "-bottom" : "";
+      clone.querySelectorAll("[id]").forEach(function (child) {
+        child.id = child.id + "-bottom";
+      });
+      // Remove sidenote float styling on bottom clones
+      clone.style.cssText = "float:none; width:auto; margin-right:0; border-left:none;";
+      footnotesContainer.appendChild(clone);
+    });
+
+    if (insertPoint) {
+      content.insertBefore(footnotesContainer, insertPoint);
+    } else {
+      // fallback: append to .content div if it exists
+      var contentDiv = content.querySelector(".content");
+      if (contentDiv) {
+        contentDiv.appendChild(footnotesContainer);
+      } else {
+        content.appendChild(footnotesContainer);
+      }
+    }
+
+    // 2. Reposition originals as sidenotes next to their references
+    var repositioned = new Set();
     el.querySelectorAll("sup.footnote-reference").forEach(function (sup) {
       var a = sup.querySelector("a");
       if (!a) return;
@@ -238,9 +301,54 @@ function repositionFootnotes(el) {
       var para = sup.closest("p, li, td, th, blockquote");
       if (para && para.parentNode) {
         para.parentNode.insertBefore(def, para.nextSibling);
+        repositioned.add(id);
+      }
+    });
+
+    // 3. Hide any originals that weren't repositioned (they're in the bottom section)
+    footnotes.forEach(function (footnote) {
+      if (!repositioned.has(footnote.id.replace(/^fn-/, ""))) {
+        footnote.style.display = "none";
       }
     });
   }
+}
+
+function repositionCitations(el) {
+  if (window.innerWidth < 1201) return;
+  if (el.querySelector(".citation-sidenote")) return;
+
+  var seen = {};
+  // Track last inserted sidenote per paragraph so they chain correctly
+  var lastNoteAfter = {};
+
+  el.querySelectorAll("a.citation").forEach(function (link) {
+    var href = link.getAttribute("href");
+    var citeId = href && href.startsWith("#") ? href.slice(1) : null;
+    if (!citeId || seen[citeId]) return;
+    seen[citeId] = true;
+
+    var citeEl = document.getElementById(citeId);
+    if (!citeEl) return;
+
+    var clone = citeEl.cloneNode(true);
+    clone.removeAttribute("id");
+    var backlinks = clone.querySelector(".ref-backlinks");
+    if (backlinks) backlinks.remove();
+
+    var note = document.createElement("div");
+    note.className = "citation-sidenote";
+    note.innerHTML = clone.innerHTML;
+
+    var para = link.closest("p, li, td, th, blockquote, .labeled-block");
+    if (!para || !para.parentNode) return;
+
+    // Insert after the last sidenote from this paragraph, or after the paragraph itself
+    var paraId = Array.prototype.indexOf.call(para.parentNode.children, para);
+    var insertAfter = lastNoteAfter[paraId] || para;
+    insertAfter.parentNode.insertBefore(note, insertAfter.nextSibling);
+    lastNoteAfter[paraId] = note;
+  });
 }
 
 // ============================================================
@@ -285,10 +393,21 @@ function createTooltip(depth) {
     tooltip.classList.add("visible");
   });
   tooltip.addEventListener("mouseleave", function () {
+    // Don't hide if user is selecting text inside the tooltip
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && tooltip.contains(sel.anchorNode)) return;
     scheduleHideTooltipAt(depth);
     // Also schedule hide on parent tooltips (they'll check child visibility)
     for (var i = depth - 1; i >= 0; i--) {
       scheduleHideTooltipAt(i);
+    }
+  });
+  // Clicking inside a tooltip keeps it alive
+  tooltip.addEventListener("mousedown", function () {
+    tooltip._pinned = true;
+    clearTimeout(tooltip._hideTimer);
+    for (var i = 0; i < depth; i++) {
+      if (_tooltipStack[i]) clearTimeout(_tooltipStack[i]._hideTimer);
     }
   });
 
@@ -337,6 +456,8 @@ function isChildTooltipVisible(depth) {
 function scheduleHideTooltipAt(depth) {
   var tooltip = _tooltipStack[depth];
   if (!tooltip) return;
+  // Don't auto-hide a pinned tooltip (user clicked inside to select text)
+  if (tooltip._pinned) return;
   clearTimeout(tooltip._hideTimer);
   tooltip._hideTimer = setTimeout(function () {
     // Don't hide if a deeper tooltip is still visible (user moved into it)
@@ -347,6 +468,7 @@ function scheduleHideTooltipAt(depth) {
     for (var i = depth + 1; i < _tooltipStack.length; i++) {
       _tooltipStack[i].classList.remove("visible");
       _tooltipStack[i].style.pointerEvents = "none";
+      _tooltipStack[i]._pinned = false;
     }
     if (depth === 0) {
       _tooltipCooldown = Date.now();
@@ -360,12 +482,18 @@ function hideTooltip() {
     clearTimeout(_tooltipStack[i]._hideTimer);
     _tooltipStack[i].classList.remove("visible");
     _tooltipStack[i].style.pointerEvents = "none";
+    _tooltipStack[i]._pinned = false;
   }
   _tooltipCooldown = Date.now();
 }
 
-// Hide tooltip on any navigation (click or popstate)
-document.addEventListener("click", function () { hideTooltip(); });
+// Hide tooltip on click outside, but not when clicking inside a tooltip
+document.addEventListener("click", function (e) {
+  for (var i = 0; i < _tooltipStack.length; i++) {
+    if (_tooltipStack[i].contains(e.target)) return;
+  }
+  hideTooltip();
+});
 window.addEventListener("popstate", function () { hideTooltip(); });
 
 // Print with diagrams prepared for light/static rendering
@@ -445,13 +573,10 @@ function setupTooltips(el, depth) {
       var tooltip = getTooltipAt(depth);
       tooltip.innerHTML = htmlContent;
       if (renderMath && window.renderMathInElement) {
-        renderMathInElement(tooltip, {
-          delimiters: [
-            { left: "\\(", right: "\\)", display: false },
-            { left: "\\[", right: "\\]", display: true },
-          ],
-          throwOnError: false,
+        var tooltipDelims = KATEX_DELIMITERS.filter(function(d) {
+          return d.left !== "$$" && d.left !== "$";
         });
+        renderMathInElement(tooltip, katexOpts(tooltipDelims));
       }
       // Add pin button for blocks that have label metadata
       var blockLabel = link.getAttribute("data-block-label");
@@ -520,6 +645,16 @@ function setupTooltips(el, depth) {
       } else {
         var preview = link.getAttribute("data-preview");
         if (preview) showTooltipWithContent(link, markdownPreview(preview), true);
+      }
+    });
+
+    // Citations — show the formatted bibliography entry on hover
+    bindTooltip(el.querySelectorAll("a.citation"), function (link) {
+      var href = link.getAttribute("href");
+      var citeId = href && href.startsWith("#") ? href.slice(1) : null;
+      var citeEl = citeId ? document.getElementById(citeId) : null;
+      if (citeEl) {
+        showTooltipWithContent(link, citeEl.innerHTML, false);
       }
     });
 
@@ -752,7 +887,11 @@ function setupMediaEmbeds(el) {
       obj.width = "100%";
       obj.height = "600";
       var fallback = document.createElement("p");
-      fallback.innerHTML = 'PDF cannot be displayed. <a href="' + src + '">Download</a>';
+      fallback.textContent = "PDF cannot be displayed. ";
+      var dlLink = document.createElement("a");
+      dlLink.href = src;
+      dlLink.textContent = "Download";
+      fallback.appendChild(dlLink);
       obj.appendChild(fallback);
       div.appendChild(obj);
     }
@@ -840,12 +979,15 @@ function setupBlockPinButtons(el) {
         btn.title = "Unpin from sidebar";
       }
     });
-    // Sync button state when pins change from the panel side
+    // Sync button state when pins change from the panel side.
+    // Use AbortController so the listener is removed when the block leaves the DOM.
+    var ac = new AbortController();
     window.addEventListener("pinned-blocks-changed", function () {
+      if (!block.isConnected) { ac.abort(); return; }
       var nowPinned = isBlockPinned(id);
       btn.textContent = nowPinned ? "unpin" : "pin";
       btn.title = nowPinned ? "Unpin from sidebar" : "Pin to sidebar";
-    });
+    }, { signal: ac.signal });
 
     header.style.position = "relative";
     header.appendChild(btn);

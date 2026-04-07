@@ -3,6 +3,7 @@ resolver = "3"
 members = ["crates/*"]
 
 [workspace.dependencies]
+anyhow = "1"
 console_error_panic_hook = "0.1.7"
 console_log = "1.0.0"
 js-sys = "0.3.89"
@@ -11,6 +12,7 @@ leptos_meta = "0.8.6"
 leptos_router = { version = "0.8.12", features = ["nightly"] }
 log = "0.4.29"
 nucleo-matcher = "0.3"
+postcard = { version = "1", features = ["alloc"] }
 proc-macro2 = "1.0"
 pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
 quote = "1.0"
@@ -22,12 +24,13 @@ wasm-bindgen-test = "0.3.64"
 web-sys = "0.3.89"
 
 [package]
-name = "homepage"
+name = "blog"
 version = "0.0.0"
 edition = "2024"
 build = "build/build.rs"
 
 [dependencies]
+ir = { path = "crates/ir" }
 macros = { path = "crates/macros" }
 console_error_panic_hook = { workspace = true }
 console_log = { workspace = true }
@@ -37,7 +40,7 @@ leptos_meta = { workspace = true }
 leptos_router = { workspace = true }
 log = { workspace = true }
 nucleo-matcher = { workspace = true }
-pulldown-cmark = { workspace = true }
+postcard = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }

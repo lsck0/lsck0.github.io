@@ -3,7 +3,7 @@ title: Category Theory Fundamentals
 description: Categories, functors, natural transformations, and the language of modern mathematics.
 tags: math, category-theory
 publication: math
-toc: true
+toc: false
 ---
 
 **Category theory** provides a high-level language for mathematics, formalizing abstraction itself.
@@ -11,6 +11,7 @@ toc: true
 ## Definition
 
 A **category** $\mathcal{C}$ consists of:
+
 - A class of **objects** $\text{Ob}(\mathcal{C})$
 - For each pair of objects $(A, B)$, a set $\text{Hom}(A, B)$ of **morphisms**
 - Composition: $\text{Hom}(B, C) \times \text{Hom}(A, B) \to \text{Hom}(A, C)$
@@ -32,17 +33,18 @@ A category $\mathcal{C}$ consists of objects and morphisms satisfying:
 ## Functors
 
 A **functor** $F: \mathcal{C} \to \mathcal{D}$ maps:
+
 - Objects: $F(A) \in \text{Ob}(\mathcal{D})$
 - Morphisms: $F(f: A \to B) \to F(A) \to F(B)$
 
 Functors preserve composition and identities.
 
 ```axiom Functor Composition {#ax:functor-compose}
-F(g \circ f) = F(g) \circ F(f)
+$F(g \circ f) = F(g) \circ F(f)$
 ```
 
 ```axiom Identity Functor {#ax:identity-functor}
-1_{\mathcal{C}}(A) = A \quad \text{and} \quad 1_{\mathcal{C}}(f) = f
+$1_{\mathcal{C}}(A) = A \quad \text{and} \quad 1_{\mathcal{C}}(f) = f$
 ```
 
 ## Natural transformations
@@ -62,6 +64,7 @@ A colimit of a diagram $D: \mathcal{J} \to \mathcal{C}$ is a universal cocone fr
 ```
 
 Examples:
+
 - Products and coproducts (limits/colimits over discrete categories)
 - Equalizers and coequalizers
 - Pullbacks and pushouts

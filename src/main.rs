@@ -47,6 +47,10 @@ fn main() {
     _ = console_log::init_with_level(log::Level::Warn);
     console_error_panic_hook::set_once();
 
+    // Inject KaTeX macros from content/macros.tex into JS global scope
+    let macros_js = format!("window.KATEX_MACROS={};", models::post::KATEX_MACROS_JSON);
+    let _ = js_sys::eval(&macros_js);
+
     mount_to_body(|| {
         provide_meta_context();
         provide_context(SidebarState::new());

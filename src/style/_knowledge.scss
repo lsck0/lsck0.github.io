@@ -20,7 +20,7 @@
 
     ul, ol {
       margin: 0.5rem 0;
-      padding-left: 1.5rem;
+      padding-left: 2.5rem;
     }
   }
 }
@@ -53,6 +53,99 @@
   font-size: 1.1em;
   line-height: 1;
   margin-top: -1.5em;
+}
+
+// ---- Figure blocks ----
+
+.labeled-block.figure {
+  margin: 1.5rem 0;
+  text-align: center;
+
+  figcaption {
+    margin-top: 0.5rem;
+    font-size: 0.9em;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  // Images and diagrams inside figures
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .tikz-diagram,
+  .mermaid,
+  .post-figure {
+    margin: 0 auto;
+  }
+}
+
+// ---- Citations ----
+
+.citation {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85em;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.cite-group {
+  white-space: nowrap;
+}
+
+.cite-broken {
+  color: var(--tag-exclude-text);
+  font-weight: 700;
+}
+
+// ---- Bibliography ----
+
+.bibliography {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+
+  h2 {
+    font-size: 1.2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .bib-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .bib-entry {
+    margin-bottom: 0.5rem;
+    padding-left: 2.5rem;
+    text-indent: -2.5rem;
+    font-size: 0.9em;
+    line-height: 1.6;
+
+    .bib-number {
+      color: var(--accent);
+      font-weight: 600;
+      margin-right: 0.3rem;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    em {
+      font-style: italic;
+    }
+  }
 }
 
 // ---- Statement → Proof association ----
@@ -123,7 +216,7 @@
   padding: 0.75rem 1rem;
   background: var(--bg-alt);
   border: 1px solid var(--border);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
   font-size: 0.85rem;
   line-height: 1.7;
   pointer-events: auto;
@@ -138,7 +231,7 @@
 
   ol, ul {
     margin: 0.25rem 0;
-    padding-left: 1.5rem;
+    padding-left: 2rem;
   }
 
   code {
@@ -176,9 +269,7 @@
   }
 }
 
-[data-theme="dark"] .xref-tooltip {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-}
+// Dark mode shadows are now handled by --shadow-lg CSS variable in _theme.scss
 
 // ---- External link preview ----
 

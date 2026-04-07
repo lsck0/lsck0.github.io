@@ -288,6 +288,20 @@
     }
   }
 
+  .bibliography {
+    break-before: auto;
+    font-size: 8pt;
+    margin-top: 1.5em;
+
+    h2 {
+      font-size: 10pt;
+    }
+
+    .bib-entry {
+      font-size: 8pt;
+    }
+  }
+
   // ---- Headings should not be orphaned ----
 
   h1, h2, h3, h4 {

@@ -1,11 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_location};
 
 use super::{SidebarState, toggle_in_set};
 use crate::{
-    components::listing::{ProjectStatus, render_segments, segments_has_scrambled, segments_plain_value},
+    components::listing::{ProjectStatus, segments_plain_value, sidebar_label},
     models::post::{POSTS, Post},
     pages::{projects::PROJECTS, publications::PUBLICATIONS},
 };
@@ -99,7 +99,16 @@ pub fn Sidebar() -> impl IntoView {
                 <span class="folder-icon">
                     {move || if state.is_blog_open.get() { "\u{25be}" } else { "\u{25b8}" }}
                 </span>
-                " blog"
+                " "
+                <A
+                    href="/blog"
+                    on:click=move |event| {
+                        event.stop_propagation();
+                        close_sidebar();
+                    }
+                >
+                    "blog"
+                </A>
             </div>
 
             <ul
@@ -152,7 +161,7 @@ pub fn Sidebar() -> impl IntoView {
                                 .into_any()
                         }
                         TreeItem::PostEntry { post, depth, parent } => {
-                            let slug = post.slug.to_string();
+                            let slug = post.slug().to_string();
                             view! {
                                 <li
                                     class=move || {
@@ -255,16 +264,7 @@ pub fn Sidebar() -> impl IntoView {
                                     let current_status_id = status_id.clone();
                                     let title_plain = segments_plain_value(entry.title);
                                     let href = format!("/projects#{}", title_plain);
-                                    let label = if segments_has_scrambled(entry.title) {
-
-                                        // Private projects grouped by status
-                                        view! {
-                                            <span class="teaser">{render_segments(entry.title)}</span>
-                                        }
-                                            .into_any()
-                                    } else {
-                                        view! { {title_plain} }.into_any()
-                                    };
+                                    let label = sidebar_label(entry.title);
                                     view! {
                                         <li
                                             class="tree-post"
@@ -323,14 +323,7 @@ pub fn Sidebar() -> impl IntoView {
                         .map(|entry| {
                             let title_plain = segments_plain_value(entry.title);
                             let href = format!("/projects#{}", title_plain);
-                            let label = if segments_has_scrambled(entry.title) {
-
-                                // Professional projects flat list
-                                view! { <span class="teaser">{render_segments(entry.title)}</span> }
-                                    .into_any()
-                            } else {
-                                view! { {title_plain} }.into_any()
-                            };
+                            let label = sidebar_label(entry.title);
                             view! {
                                 <li class="tree-post" style="padding-left: 1.5rem">
                                     <A href=href on:click=move |_| close_sidebar()>
@@ -466,12 +459,7 @@ pub fn Sidebar() -> impl IntoView {
                     .map(|entry| {
                         let title_plain = segments_plain_value(entry.title);
                         let href = format!("/publications#{}", title_plain);
-                        let label = if segments_has_scrambled(entry.title) {
-                            view! { <span class="teaser">{render_segments(entry.title)}</span> }
-                                .into_any()
-                        } else {
-                            view! { {title_plain} }.into_any()
-                        };
+                        let label = sidebar_label(entry.title);
                         view! {
                             <li class="tree-post" style="padding-left: 0.75rem">
                                 <A href=href on:click=move |_| close_sidebar()>
@@ -493,12 +481,12 @@ pub fn Sidebar() -> impl IntoView {
 
 fn build_post_tree() -> TreeNode {
     let mut root = TreeNode::new();
-    for post in POSTS {
-        if post.folder.is_empty() {
+    for post in POSTS.iter() {
+        if post.folder().is_empty() {
             root.posts.push(post);
         } else {
             let mut node = &mut root;
-            for segment in post.folder.split('/') {
+            for segment in post.folder().split('/') {
                 node = node.children.entry(segment.to_string()).or_insert_with(TreeNode::new);
             }
             node.posts.push(post);
@@ -539,7 +527,7 @@ fn parent_folder_of(path: &str) -> String {
     }
 }
 
-fn is_path_collapsed(path: &str, collapsed: &std::collections::BTreeSet<String>) -> bool {
+fn is_path_collapsed(path: &str, collapsed: &BTreeSet<String>) -> bool {
     if path.is_empty() {
         return false;
     }

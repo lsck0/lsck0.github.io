@@ -1,0 +1,172 @@
+% KaTeX macros — loaded globally for all math rendering.
+% Uses standard LaTeX \newcommand syntax. Parsed at compile time.
+%
+% Supported forms:
+%   \newcommand{\name}{expansion}          — zero arguments
+%   \newcommand{\name}[N]{expansion}       — N positional arguments (#1, #2, ...)
+%   \renewcommand works identically.
+%
+% Lines starting with % are comments. Blank lines are ignored.
+
+% ---- Blackboard bold letters ----
+\newcommand{\A}{\mathbb{A}}
+\newcommand{\B}{\mathbb{B}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\D}{\mathbb{D}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\G}{\mathbb{G}}
+\renewcommand{\H}{\mathbb{H}}
+\newcommand{\I}{\mathbb{I}}
+\newcommand{\J}{\mathbb{J}}
+\newcommand{\K}{\mathbb{K}}
+\renewcommand{\L}{\mathbb{L}}
+\newcommand{\M}{\mathbb{M}}
+\newcommand{\N}{\mathbb{N}}
+\renewcommand{\O}{\mathbb{O}}
+\renewcommand{\P}{\mathbb{P}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\renewcommand{\S}{\mathbb{S}}
+\newcommand{\T}{\mathbb{T}}
+\newcommand{\U}{\mathbb{U}}
+\newcommand{\V}{\mathbb{V}}
+\newcommand{\W}{\mathbb{W}}
+\newcommand{\X}{\mathbb{X}}
+\newcommand{\Y}{\mathbb{Y}}
+\newcommand{\Z}{\mathbb{Z}}
+
+% ---- Calligraphic letters ----
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cB}{\mathcal{B}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cH}{\mathcal{H}}
+\newcommand{\cI}{\mathcal{I}}
+\newcommand{\cJ}{\mathcal{J}}
+\newcommand{\cK}{\mathcal{K}}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\cN}{\mathcal{N}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\cP}{\mathcal{P}}
+\newcommand{\cQ}{\mathcal{Q}}
+\newcommand{\cR}{\mathcal{R}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cT}{\mathcal{T}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cV}{\mathcal{V}}
+\newcommand{\cW}{\mathcal{W}}
+\newcommand{\cX}{\mathcal{X}}
+\newcommand{\cY}{\mathcal{Y}}
+\newcommand{\cZ}{\mathcal{Z}}
+
+% ---- Fraktur letters ----
+\newcommand{\fA}{\mathfrak{A}}
+\newcommand{\fB}{\mathfrak{B}}
+\newcommand{\fC}{\mathfrak{C}}
+\newcommand{\fD}{\mathfrak{D}}
+\newcommand{\fE}{\mathfrak{E}}
+\newcommand{\fF}{\mathfrak{F}}
+\newcommand{\fG}{\mathfrak{G}}
+\newcommand{\fH}{\mathfrak{H}}
+\newcommand{\fI}{\mathfrak{I}}
+\newcommand{\fJ}{\mathfrak{J}}
+\newcommand{\fK}{\mathfrak{K}}
+\newcommand{\fL}{\mathfrak{L}}
+\newcommand{\fM}{\mathfrak{M}}
+\newcommand{\fN}{\mathfrak{N}}
+\newcommand{\fO}{\mathfrak{O}}
+\newcommand{\fP}{\mathfrak{P}}
+\newcommand{\fQ}{\mathfrak{Q}}
+\newcommand{\fR}{\mathfrak{R}}
+\newcommand{\fS}{\mathfrak{S}}
+\newcommand{\fT}{\mathfrak{T}}
+\newcommand{\fU}{\mathfrak{U}}
+\newcommand{\fV}{\mathfrak{V}}
+\newcommand{\fW}{\mathfrak{W}}
+\newcommand{\fX}{\mathfrak{X}}
+\newcommand{\fY}{\mathfrak{Y}}
+\newcommand{\fZ}{\mathfrak{Z}}
+
+% ---- Greek shortcuts ----
+\newcommand{\vphi}{\varphi}
+\newcommand{\vep}{\varepsilon}
+\newcommand{\vth}{\vartheta}
+
+% ---- Upright constants ----
+\newcommand{\ce}{\mathrm{e}}
+\newcommand{\ci}{\mathrm{i}}
+\newcommand{\cd}{\mathrm{d}}
+\newcommand{\dx}{\mathrm{d} x}
+\newcommand{\dy}{\mathrm{d} y}
+\newcommand{\dz}{\mathrm{d} z}
+\newcommand{\dt}{\mathrm{d} t}
+
+% ---- Delimiters (auto-sized) ----
+\newcommand{\Pa}[1]{\left( #1 \right)}
+\newcommand{\Br}[1]{\left[ #1 \right]}
+\newcommand{\Cu}[1]{\left\{ #1 \right\}}
+\newcommand{\Sp}[1]{\left\langle #1 \right\rangle}
+\newcommand{\Abs}[1]{\left\lvert #1 \right\rvert}
+\newcommand{\Norm}[1]{\left\lVert #1 \right\rVert}
+
+% ---- Derivatives ----
+\newcommand{\del}{\partial}
+\newcommand{\dfrac}[2]{\frac{\mathrm{d} #1}{\mathrm{d} #2}}
+\newcommand{\pfrac}[2]{\frac{\partial #1}{\partial #2}}
+
+% ---- Matrices / cases ----
+\newcommand{\mat}[1]{\begin{pmatrix} #1 \end{pmatrix}}
+\newcommand{\case}[1]{\begin{cases} #1 \end{cases}}
+
+% ---- Category names ----
+\newcommand{\Set}{\mathsf{Set}}
+\newcommand{\FinSet}{\mathsf{FinSet}}
+\newcommand{\AbGroup}{\mathsf{AbGroup}}
+\newcommand{\Group}{\mathsf{Group}}
+\newcommand{\Rng}{\mathsf{Rng}}
+\newcommand{\Ring}{\mathsf{Ring}}
+\newcommand{\Field}{\mathsf{Field}}
+\newcommand{\Mod}{\mathsf{Mod}}
+\newcommand{\Vect}{\mathsf{Vect}}
+\newcommand{\Top}{\mathsf{Top}}
+\newcommand{\Mfd}{\mathsf{Mfd}}
+
+% ---- Operators ----
+\newcommand{\Alt}{\mathrm{Alt}}
+\newcommand{\Aut}{\mathrm{Aut}}
+\newcommand{\CP}{\mathbb{C} P}
+\newcommand{\End}{\mathrm{End}}
+\newcommand{\Ext}{\mathrm{Ext}}
+\newcommand{\Gal}{\mathrm{Gal}}
+\newcommand{\HP}{\mathbb{H} P}
+\newcommand{\Hom}{\mathrm{Hom}}
+\newcommand{\Int}{\mathrm{Int}}
+\newcommand{\Mat}{\mathrm{Mat}}
+\newcommand{\Mor}{\mathrm{Mor}}
+\newcommand{\RP}{\mathbb{R} P}
+\newcommand{\Sym}{\mathrm{Sym}}
+\newcommand{\TC}{\mathsf{TC}}
+\newcommand{\Tor}{\mathrm{Tor}}
+\newcommand{\Zmod}[1]{\mathbb{Z} / #1 \mathbb{Z}}
+
+% ---- Small operators ----
+\newcommand{\cat}{\mathsf{cat}}
+\newcommand{\cl}{\mathrm{cl}}
+\newcommand{\codom}{\mathrm{codom}}
+\newcommand{\colim}{\mathrm{colim}}
+\newcommand{\dom}{\mathrm{dom}}
+\newcommand{\id}{\mathrm{id}}
+\newcommand{\im}{\mathrm{im}}
+\newcommand{\inv}[1]{#1^{-1}}
+\newcommand{\pr}{\mathrm{pr}}
+\newcommand{\rk}{\mathrm{rk}}
+\newcommand{\secat}{\mathsf{secat}}
+\newcommand{\skel}[2]{{#1}^{(#2)}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\wgt}{\mathrm{wgt}}
+\newcommand{\zcl}{\mathrm{zcl}}

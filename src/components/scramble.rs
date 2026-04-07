@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use leptos::prelude::*;
 
-const SCRAMBLE_CHARACTERS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789!@#$%&*~^+-=<>/\\|{}[]()_:;?.,";
+const SCRAMBLE_CHARACTERS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789!@#%&*~^+-=<>/|{}[]()_:;?.,";
 const TICK_INTERVAL_MS: u64 = 75;
 
 fn random_character() -> char {
