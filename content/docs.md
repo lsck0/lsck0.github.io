@@ -703,47 +703,104 @@ to add the blog's search as a search engine. The search URL points to `/blog?q={
 ## Content LSP
 
 A language server at `crates/lsp/` provides IDE features for markdown content
-editing: autocomplete for `[[cross-references]]` and `[@citations]`, go-to-definition,
-and diagnostics for broken references.
-
-### Running the LSP
-
-```bash
-cargo run --package lsp
-```
-
-The LSP reads from the `content/` directory and indexes all post labels, BibTeX
-entries, and post slugs. Configure your editor to use it as a language server
-for `.md` files in the `content/posts/` directory.
-
-### Editor configuration
-
-**Neovim (via nvim-lspconfig):**
-
-```lua
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "markdown",
-  callback = function()
-    vim.lsp.start({
-      name = "blog-lsp",
-      cmd = { "cargo", "run", "--package", "lsp" },
-      root_dir = vim.fn.getcwd(),
-    })
-  end,
-})
-```
-
-**VS Code:** Add a `.vscode/settings.json` entry pointing to the LSP binary,
-or use a generic LSP client extension.
+editing. It indexes all post labels, BibTeX entries, and post slugs from the
+`content/` directory and provides real-time feedback while authoring.
 
 ### Features
 
 | Feature | Trigger | Description |
 | --- | --- | --- |
-| Autocomplete | `[[` | Suggests labels from all posts |
-| Autocomplete | `[@` | Suggests BibTeX keys from `references.bib` |
-| Go-to-definition | `[[label]]` | Jumps to the labeled block |
-| Diagnostics | Save | Warns about broken cross-references |
+| Autocomplete | `[[` | Suggests all labels (definitions, theorems, etc.) and post slugs |
+| Autocomplete | `[@` | Suggests BibTeX keys from `content/references.bib` |
+| Go-to-definition | `[[label]]` | Jumps to the source file containing the labeled block |
+| Diagnostics | On save | Warns about undefined `[[label]]` or `[@key]` references |
+| Index rebuild | On save | Automatically re-indexes when any `.md` file is saved |
+
+### How it works
+
+1. On startup, the LSP scans `content/posts/` recursively for `.md` files
+2. Each file is parsed to extract frontmatter (title, toc) and labeled blocks
+3. `content/references.bib` is parsed for citation keys
+4. A content index maps labels → (kind, title, slug) and keys → display labels
+5. Completions, definitions, and diagnostics query this index
+6. Saving any file triggers a full re-index
+
+### Running the LSP
+
+Build and run directly:
+
+```bash
+cargo run --package lsp
+```
+
+Or build a release binary for faster startup:
+
+```bash
+cargo build --release --package lsp
+# binary at target/release/lsp
+```
+
+### Editor configuration
+
+#### Neovim
+
+Add to your Neovim config (e.g. `~/.config/nvim/lua/plugins/blog-lsp.lua` or
+directly in `init.lua`). This attaches the LSP only to markdown files within
+the blog project directory:
+
+```lua
+-- blog content LSP: autocomplete for [[cross-refs]] and [@citations]
+local blog_root = vim.fn.expand("~/code/lsck0.github.io")
+local lsp_cmd = { blog_root .. "/target/release/lsp" }
+
+-- fall back to cargo run if no release binary
+if vim.fn.executable(lsp_cmd[1]) == 0 then
+  lsp_cmd = { "cargo", "run", "--package", "lsp" }
+end
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "markdown",
+  callback = function(args)
+    -- only attach when editing files inside the blog project
+    local file = vim.api.nvim_buf_get_name(args.buf)
+    if not file:find(blog_root, 1, true) then return end
+
+    vim.lsp.start({
+      name = "blog-lsp",
+      cmd = lsp_cmd,
+      root_dir = blog_root,
+      settings = {},
+    })
+  end,
+})
+```
+
+If using `lazy.nvim`, wrap in a plugin spec:
+
+```lua
+return {
+  dir = "~/code/lsck0.github.io",
+  ft = "markdown",
+  config = function()
+    -- paste the autocmd block above here
+  end,
+}
+```
+
+#### VS Code
+
+Use a generic LSP client extension (e.g. "vscode-languageclient") with this
+`.vscode/settings.json`:
+
+```json
+{
+  "languageServerExample.serverPath": "./target/release/lsp",
+  "languageServerExample.fileTypes": ["markdown"]
+}
+```
+
+Or point any LSP client extension to `cargo run --package lsp` as the server
+command with the project root as the workspace directory.
 
 ## Anti-AI Measures
 

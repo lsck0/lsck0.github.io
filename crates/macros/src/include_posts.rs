@@ -64,8 +64,8 @@ pub fn include_posts_impl(_input: TokenStream) -> TokenStream {
         // Auto-link definitions
         resolve::auto_link_definitions(&mut page.content, &registry);
 
-        // Extract internal/external links
-        let (internal, external) = resolve::extract_links(&page.content);
+        // Extract internal/external links (registry detects bare cross-refs to other posts)
+        let (internal, external) = resolve::extract_links(&page.content, &slug, &registry);
         page.internal_links = internal;
         page.external_links = external;
     }

@@ -99,13 +99,9 @@
       color: var(--accent);
     }
 
-    &.active {
-      background: var(--bg-alt);
-
-      a {
-        color: var(--sidebar-active);
-        font-weight: bold;
-      }
+    &.active a {
+      color: var(--sidebar-active);
+      font-weight: bold;
     }
   }
 }

@@ -257,7 +257,8 @@
       clear: right;
       width: 220px;
       margin-right: -250px;
-      margin-top: -0.75rem;
+      margin-top: 0;
+      margin-bottom: 0.5rem;
       padding-left: 0;
       font-size: 0.75rem;
       border-left: 1px solid var(--border);
@@ -375,20 +376,20 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
   position: absolute;
   top: 0;
   right: 0;
-  background: var(--code-bg);
-  border: none;
-  border-left: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  border: 1px solid var(--border);
   color: var(--text-muted);
   font-family: inherit;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s ease;
   font-size: 0.65rem;
-  padding: 0.1rem 0.4rem;
+  padding: 0.1rem 0.35rem;
+  line-height: 1.4;
 
   &:hover {
-    color: var(--text);
+    color: var(--accent);
+    border-color: var(--accent);
     opacity: 1 !important;
   }
 
@@ -396,7 +397,7 @@ iframe[src*="youtube"], iframe[src*="youtu.be"] {
   .math-display:hover &,
   .tikz-diagram:hover &,
   .mermaid:hover & {
-    opacity: 0.6;
+    opacity: 0.7;
   }
 }
 

@@ -505,47 +505,65 @@ fn is_word_end(text: &str, pos: usize) -> bool {
 // ============================================================
 
 /// Extract internal and external links from a page's content tree.
-pub fn extract_links(content: &[Block]) -> (Vec<String>, Vec<String>) {
+/// `current_slug` identifies the current page; `registry` maps labels to their
+/// owning slug so bare `[[label]]` refs to other posts are tracked as internal links.
+pub fn extract_links(
+    content: &[Block],
+    current_slug: &str,
+    registry: &HashMap<String, LabelInfo>,
+) -> (Vec<String>, Vec<String>) {
     let mut internal = Vec::new();
     let mut external = Vec::new();
 
     for block in content {
-        extract_links_from_block(block, &mut internal, &mut external);
+        extract_links_from_block(block, current_slug, registry, &mut internal, &mut external);
     }
 
     return (internal, external);
 }
 
-fn extract_links_from_block(block: &Block, internal: &mut Vec<String>, external: &mut Vec<String>) {
+fn extract_links_from_block(
+    block: &Block,
+    current_slug: &str,
+    registry: &HashMap<String, LabelInfo>,
+    internal: &mut Vec<String>,
+    external: &mut Vec<String>,
+) {
     match block {
         Block::Heading { children, .. } | Block::Paragraph(children) => {
-            extract_links_from_inlines(children, internal, external);
+            extract_links_from_inlines(children, current_slug, registry, internal, external);
         }
         Block::LabeledBlock { content, .. }
         | Block::Figure { content, .. }
         | Block::Callout { content, .. }
         | Block::Blockquote(content) => {
             for b in content {
-                extract_links_from_block(b, internal, external);
+                extract_links_from_block(b, current_slug, registry, internal, external);
             }
         }
         Block::List { items, .. } => {
             for item in items {
                 for b in item {
-                    extract_links_from_block(b, internal, external);
+                    extract_links_from_block(b, current_slug, registry, internal, external);
                 }
             }
         }
         Block::FootnoteDef { content, .. } => {
             for b in content {
-                extract_links_from_block(b, internal, external);
+                extract_links_from_block(b, current_slug, registry, internal, external);
             }
         }
         _ => {}
     }
 }
 
-fn extract_links_from_inlines(inlines: &[Inline], internal: &mut Vec<String>, external: &mut Vec<String>) {
+fn extract_links_from_inlines(
+    inlines: &[Inline],
+    current_slug: &str,
+    registry: &HashMap<String, LabelInfo>,
+    internal: &mut Vec<String>,
+    external: &mut Vec<String>,
+) {
     for inline in inlines {
         match inline {
             Inline::Link { url, children, .. } => {
@@ -557,19 +575,24 @@ fn extract_links_from_inlines(inlines: &[Inline], internal: &mut Vec<String>, ex
                 } else if url.starts_with("http") && !external.contains(url) {
                     external.push(url.clone());
                 }
-                extract_links_from_inlines(children, internal, external);
+                extract_links_from_inlines(children, current_slug, registry, internal, external);
             }
             Inline::CrossRef { label, .. } => {
-                // [[slug#label]] references another post
+                // [[slug#label]] — explicit cross-post reference
                 if let Some(hash) = label.find('#') {
                     let slug = &label[..hash];
                     if !slug.is_empty() && !internal.contains(&slug.to_string()) {
                         internal.push(slug.to_string());
                     }
+                } else if let Some(info) = registry.get(label) {
+                    // bare [[label]] that resolves to a different post
+                    if info.slug != current_slug && !internal.contains(&info.slug) {
+                        internal.push(info.slug.clone());
+                    }
                 }
             }
             Inline::Bold(c) | Inline::Italic(c) | Inline::Strikethrough(c) => {
-                extract_links_from_inlines(c, internal, external);
+                extract_links_from_inlines(c, current_slug, registry, internal, external);
             }
             _ => {}
         }

@@ -2,8 +2,11 @@ use leptos::prelude::*;
 use leptos_meta::*;
 
 use crate::{
-    components::{layout::Layout, render::call_render_post},
-    models::meta::META,
+    components::{
+        layout::Layout,
+        render::{PostPreview, call_render_post},
+    },
+    models::{meta::META, post::POSTS},
 };
 
 pub mod about;
@@ -26,7 +29,15 @@ pub mod tos;
 /// Uses the IR pipeline so prose pages get the same features as blog posts.
 pub fn prose_page(page_key: &'static str, content: &str) -> impl IntoView {
     let (blocks, _) = ir::parse::parse_markdown(content, false);
-    let (html, _) = crate::components::render::render_content(&blocks, |_| None);
+    let (html, _) = crate::components::render::render_content(&blocks, |slug| {
+        let target = POSTS.iter().find(|p| p.slug() == slug)?;
+        Some(PostPreview {
+            title: target.title().to_string(),
+            description: target.description().to_string(),
+            tags: target.tags().join(", "),
+            series: target.series().unwrap_or("").to_string(),
+        })
+    });
     call_render_post();
 
     return view! {

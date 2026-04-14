@@ -98,6 +98,7 @@ fn rerender_math_in(selector: &str) {
 pub fn PinnedPanel() -> impl IntoView {
     let (blocks, set_blocks) = signal(storage::read_pinned_blocks());
     let (is_mobile_open, set_is_mobile_open) = signal(false);
+    let (is_desktop_open, set_is_desktop_open) = signal(true);
     let (is_study_open, set_is_study_open) = signal(false);
 
     // Listen for changes from the JS pin/unpin buttons
@@ -113,13 +114,29 @@ pub fn PinnedPanel() -> impl IntoView {
         });
     });
 
-    // Set data-has-pins attribute on html element
+    // Set data-has-pins attribute on html element (only when desktop panel is open)
     Effect::new(move |_: Option<()>| {
-        set_has_pins_attribute(!blocks.get().is_empty());
+        set_has_pins_attribute(!blocks.get().is_empty() && is_desktop_open.get());
     });
 
+    // Deferred cleanup: clear data-has-pins when PinnedPanel unmounts (e.g. navigating
+    // to HomePage which has no Layout). Checks if a pinned-panel still exists in DOM —
+    // if a new PinnedPanel mounted (Layout→Layout nav), the element is present and we
+    // skip clearing so the new component's Effect stays in control.
     on_cleanup(move || {
-        set_has_pins_attribute(false);
+        let _ = web_sys::window().map(|w| {
+            let cb = Closure::<dyn FnMut()>::once(move || {
+                let panel_exists = web_sys::window()
+                    .and_then(|w| w.document())
+                    .and_then(|d| d.query_selector(".pinned-panel").ok().flatten())
+                    .is_some();
+                if !panel_exists {
+                    set_has_pins_attribute(false);
+                }
+            });
+            let _ = w.set_timeout_with_callback(cb.as_ref().unchecked_ref());
+            cb.forget();
+        });
     });
 
     // Re-render math in the pinned panel when blocks change
@@ -147,7 +164,25 @@ pub fn PinnedPanel() -> impl IntoView {
                 })
         }}
 
-        // Pinned panel (block list only — study mode is now a separate modal)
+        // Desktop toggle button (visible when panel is closed)
+        {move || {
+            let has_pins = !blocks.get().is_empty();
+            let desktop_closed = !is_desktop_open.get();
+            (has_pins && desktop_closed)
+                .then(|| {
+                    view! {
+                        <button
+                            class="pins-desktop-toggle"
+                            on:click=move |_| set_is_desktop_open.set(true)
+                            title="Show pinned blocks"
+                        >
+                            {move || format!("\u{1f4cc}{}", blocks.get().len())}
+                        </button>
+                    }
+                })
+        }}
+
+        // Pinned panel
         {move || {
             let pinned = blocks.get();
             if pinned.is_empty() {
@@ -155,7 +190,11 @@ pub fn PinnedPanel() -> impl IntoView {
             }
             Some(
                 view! {
-                    <div class="pinned-panel" class:mobile-open=move || is_mobile_open.get()>
+                    <div
+                        class="pinned-panel"
+                        class:mobile-open=move || is_mobile_open.get()
+                        class:desktop-open=move || is_desktop_open.get()
+                    >
                         <div class="pinned-panel-header">
                             <span class="pinned-panel-title">"pinned"</span>
                             <div class="pinned-panel-actions">
@@ -174,6 +213,13 @@ pub fn PinnedPanel() -> impl IntoView {
                                     }
                                 >
                                     "clear all"
+                                </button>
+                                <button
+                                    class="pinned-panel-close"
+                                    on:click=move |_| set_is_desktop_open.set(false)
+                                    title="Close pinned panel"
+                                >
+                                    "\u{2715}"
                                 </button>
                                 <button class="pinned-panel-close-mobile" on:click=close_mobile>
                                     "\u{2715}"
