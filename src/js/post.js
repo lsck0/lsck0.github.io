@@ -22,9 +22,18 @@ function katexOpts(delimiters) {
 
 function renderPost() {
   requestAnimationFrame(function () {
+    // render math in sidebar and blog listing titles
+    if (window.renderMathInElement) {
+      var sidebar = document.querySelector(".sidebar");
+      if (sidebar) renderMathInElement(sidebar, katexOpts(KATEX_DELIMITERS));
+
+      var blogList = document.querySelector(".blog-page");
+      if (blogList) renderMathInElement(blogList, katexOpts(KATEX_DELIMITERS));
+    }
+
     var el = document.getElementById("post-content");
     if (!el) {
-      // Also handle listing pages (projects, publications)
+      // also handle listing pages (projects, publications)
       var listingEl = document.getElementById("listing-content");
       if (listingEl) {
         if (window.renderMathInElement) {

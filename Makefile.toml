@@ -30,7 +30,6 @@ script = [
     "trunk clean",
     "trunk build --release",
     "makers wasm-opt",
-    "cargo run --release --package indexer",
     "cp dist/index.html dist/404.html",
 ]
 

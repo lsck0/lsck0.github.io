@@ -30,25 +30,39 @@ pub fn include_projects_impl(_input: TokenStream) -> TokenStream {
                 .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string());
-            let status_string = toml_string_value(table, "status");
-            let status = match status_string.as_str() {
-                "maintained" => quote! { ProjectStatus::Maintained },
-                "wip" | "work in progress" => quote! { ProjectStatus::WorkInProgress },
-                "planned" => quote! { ProjectStatus::Planned },
-                "abandoned" => quote! { ProjectStatus::Abandoned },
-                other => panic!("unknown project status: {:?}", other),
-            };
             let company = toml_string_value(table, "company");
+            let anonymous = table.get("anonymous").and_then(|v| v.as_bool()).unwrap_or(false);
+            let is_professional = !company.is_empty() || anonymous;
+            let status_string = toml_string_value(table, "status");
+            let status = if status_string.is_empty() {
+                if is_professional {
+                    quote! { ProjectStatus::Maintained }
+                } else {
+                    panic!("private project missing 'status' field")
+                }
+            } else {
+                match status_string.as_str() {
+                    "maintained" => quote! { ProjectStatus::Maintained },
+                    "wip" | "work in progress" => quote! { ProjectStatus::WorkInProgress },
+                    "planned" => quote! { ProjectStatus::Planned },
+                    "abandoned" => quote! { ProjectStatus::Abandoned },
+                    other => panic!("unknown project status: {:?}", other),
+                }
+            };
             let company_tokens = if company.is_empty() {
                 quote! { None }
             } else {
                 quote! { Some(#company) }
             };
-            let anonymous = table.get("anonymous").and_then(|v| v.as_bool()).unwrap_or(false);
             let url_tokens = match &url_string {
                 Some(u) => quote! { Some(#u) },
                 None => quote! { None },
             };
+            let tools: Vec<String> = table
+                .get("tools")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                .unwrap_or_default();
             quote! {
                 ProjectEntry {
                     title: #title,
@@ -57,6 +71,7 @@ pub fn include_projects_impl(_input: TokenStream) -> TokenStream {
                     status: #status,
                     company: #company_tokens,
                     anonymous: #anonymous,
+                    tools: &[#(#tools),*],
                 }
             }
         })

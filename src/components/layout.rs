@@ -10,11 +10,6 @@ pub fn Layout(children: Children) -> impl IntoView {
     let state = use_context::<SidebarState>().expect("SidebarState context");
 
     return view! {
-        <div class="marquee-container">
-            <marquee>
-                "WORK IN PROGRESS \u{00b7} ALL CONTENT IS AI GENERATED \u{00b7} WORK IN PROGRESS \u{00b7} ALL CONTENT IS AI GENERATED"
-            </marquee>
-        </div>
         <Header />
         <GlobalSearch />
         <div

@@ -60,6 +60,24 @@ pub fn sidebar_label(title: &'static [TextSegment]) -> impl IntoView {
 }
 
 // ============================================================
+// Tools
+// ============================================================
+
+fn render_tools(tools: &'static [&'static str]) -> impl IntoView {
+    if tools.is_empty() {
+        return None;
+    }
+    Some(view! {
+        <div class="project-tools">
+            {tools
+                .iter()
+                .map(|tool| view! { <span class="project-tool">{*tool}</span> })
+                .collect_view()}
+        </div>
+    })
+}
+
+// ============================================================
 // Listing Title
 // ============================================================
 
@@ -246,6 +264,7 @@ pub struct ProjectEntry {
     pub status: ProjectStatus,
     pub company: Option<&'static str>,
     pub anonymous: bool,
+    pub tools: &'static [&'static str],
 }
 
 impl ProjectEntry {
@@ -275,19 +294,21 @@ pub fn ProjectListing(entries: &'static [ProjectEntry]) -> impl IntoView {
             let title_view = render_listing_title(entry.title, entry.url);
             let company_indicator = entry
                 .company
-                .map(|company| view! { <span class="project-company">{" · "}{company}</span> }.into_any())
+                .map(|company| view! { <span class="project-company">{" \u{00b7} "}{company}</span> }.into_any())
                 .unwrap_or_else(|| {
                     if entry.anonymous {
-                        view! { <span class="project-company">{" · "}"Professional"</span> }.into_any()
+                        view! { <span class="project-company">{" \u{00b7} "}"Professional"</span> }.into_any()
                     } else {
                         view! { <span /> }.into_any()
                     }
                 });
+            let tools_view = render_tools(entry.tools);
 
             view! {
                 <div class="professional-project" id=entry_id>
                     <div class="professional-project-header">{title_view} {company_indicator}</div>
                     <p class="listing-desc">{render_segments(entry.description)}</p>
+                    {tools_view}
                 </div>
             }
         })
@@ -315,13 +336,14 @@ pub fn ProjectListing(entries: &'static [ProjectEntry]) -> impl IntoView {
                                     RelatedKind::Project,
                                 );
                                 let title_view = render_listing_title(entry.title, entry.url);
+                                let tools_view = render_tools(entry.tools);
 
                                 view! {
                                     <li id=entry_id>
                                         {title_view}
                                         <p class="listing-desc">
                                             {render_segments(entry.description)}
-                                        </p> {related}
+                                        </p> {tools_view} {related}
                                     </li>
                                 }
                             })

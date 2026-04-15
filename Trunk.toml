@@ -1,2 +1,7 @@
 [watch]
 paths = ["content/"]
+
+[[hooks]]
+stage = "post_build"
+command = "cargo"
+command_arguments = ["run", "--package", "indexer"]

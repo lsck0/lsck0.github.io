@@ -1,20 +1,3 @@
-// ---- WIP staging banner ----
-
-.marquee-container {
-  background: var(--tag-exclude-text);
-  color: var(--bg);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.2rem 0;
-  z-index: 1200;
-
-  marquee {
-    display: block;
-  }
-}
-
 // ---- Page layout (sidebar + content) ----
 
 .page-layout {

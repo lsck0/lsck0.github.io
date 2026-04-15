@@ -196,6 +196,24 @@ pub fn BlogPage() -> impl IntoView {
         set_page.set(0);
     });
 
+    // re-render KaTeX in blog/sidebar titles whenever posts, page, or view changes
+    Effect::new(move |_: Option<()>| {
+        let _ = filtered_slugs.get();
+        let _ = page.get();
+        let _ = view_mode.get();
+        request_animation_frame(move || {
+            let _ = js_sys::eval(
+                r#"if(window.renderMathInElement){
+                    var opts=katexOpts(KATEX_DELIMITERS);
+                    var b=document.querySelector('.blog-page');
+                    if(b)renderMathInElement(b,opts);
+                    var s=document.querySelector('.sidebar');
+                    if(s)renderMathInElement(s,opts);
+                }"#,
+            );
+        });
+    });
+
     let total_pages = move || {
         let count = filtered_posts().len();
         if count == 0 { 1 } else { count.div_ceil(PAGE_SIZE) }
@@ -602,7 +620,7 @@ fn render_series_view(
                                                     <div class="series-entry">
                                                         <span class="series-num">{format!("{}.", i + 1)}</span>
                                                         <A href=post.href() attr:class="series-link">
-                                                            {post.title()}
+                                                            <span inner_html=post.title() />
                                                         </A>
                                                         {render_read_badge(slug, read_sig, set_read_sig)}
                                                     </div>
@@ -632,7 +650,7 @@ fn render_series_view(
                                 view! {
                                     <div class="series-entry">
                                         <A href=post.href() attr:class="series-link">
-                                            {post.title()}
+                                            <span inner_html=post.title() />
                                         </A>
                                         <span class="tree-file-meta">{post.date_formatted()}</span>
                                         {render_read_badge(slug, read_sig, set_read_sig)}
@@ -746,7 +764,7 @@ fn render_post_card(post: &crate::models::post::Post) -> impl IntoView {
                     title="toggle bookmark"
                 ></button>
                 <A href=href attr:class="post-title-link">
-                    {title}
+                    <span inner_html=title />
                 </A>
                 {series_hint.map(|hint| view! { <span class="post-series">{hint}</span> })}
                 {render_read_badge(slug_for_read, read_sig, set_read_sig)}

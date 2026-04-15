@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 use leptos_router::components::A;
 
-use super::toggle_theme;
+use crate::components::toggle_theme;
 
 const GIT_HASH: &str = env!("GIT_HASH");
 const GIT_DATE: &str = env!("GIT_DATE");
@@ -28,9 +28,9 @@ pub fn Footer() -> impl IntoView {
                 <a href="https://github.com/lsck0/lsck0.github.io" target="_blank">
                     "source"
                 </a> <span class="footer-sep">{"\u{00b7}"}</span>
-                <A href="/rss.xml" attr:title="RSS Feed">
+                <a href="/rss.xml" title="RSS Feed">
                     "rss"
-                </A> <span class="footer-sep">{"\u{00b7}"}</span>
+                </a> <span class="footer-sep">{"\u{00b7}"}</span>
                 <button class="theme-toggle-footer" on:click=on_toggle_theme title="Toggle theme">
                     "toggle theme"
                 </button>

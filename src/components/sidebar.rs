@@ -51,7 +51,7 @@ pub fn Sidebar() -> impl IntoView {
     let location = use_location();
 
     let tree = build_post_tree();
-    let items = flatten_tree(&tree, 1, "");
+    let items = flatten_tree(&tree, 2, "");
 
     let close_sidebar = move || {
         state.is_mobile_open.set(false);
@@ -189,7 +189,7 @@ pub fn Sidebar() -> impl IntoView {
                                     }
                                 >
                                     <A href=post.href() on:click=move |_| close_sidebar()>
-                                        {post.title()}
+                                        <span inner_html=post.title() />
                                     </A>
                                 </li>
                             }
@@ -268,7 +268,7 @@ pub fn Sidebar() -> impl IntoView {
                                     view! {
                                         <li
                                             class="tree-post"
-                                            style:padding-left="2.25rem"
+                                            style:padding-left="3rem"
                                             style:display=move || {
                                                 if state
                                                     .collapsed_project_groups
@@ -291,7 +291,7 @@ pub fn Sidebar() -> impl IntoView {
                             view! {
                                 <li
                                     class="tree-folder"
-                                    style="padding-left: 1.5rem"
+                                    style="padding-left: 2.25rem"
                                     on:click=move |_| {
                                         state
                                             .collapsed_project_groups
@@ -325,7 +325,7 @@ pub fn Sidebar() -> impl IntoView {
                             let href = format!("/projects#{}", title_plain);
                             let label = sidebar_label(entry.title);
                             view! {
-                                <li class="tree-post" style="padding-left: 1.5rem">
+                                <li class="tree-post" style="padding-left: 2.25rem">
                                     <A href=href on:click=move |_| close_sidebar()>
                                         {label}
                                     </A>
@@ -342,7 +342,7 @@ pub fn Sidebar() -> impl IntoView {
                                     view! {
                                         <li
                                             class="tree-folder"
-                                            style="padding-left: 0.75rem"
+                                            style="padding-left: 1.5rem"
                                             on:click=move |_| {
                                                 state
                                                     .collapsed_project_groups
@@ -376,7 +376,7 @@ pub fn Sidebar() -> impl IntoView {
                                     view! {
                                         <li
                                             class="tree-folder"
-                                            style="padding-left: 0.75rem"
+                                            style="padding-left: 1.5rem"
                                             on:click=move |_| {
                                                 state
                                                     .collapsed_project_groups
@@ -461,7 +461,7 @@ pub fn Sidebar() -> impl IntoView {
                         let href = format!("/publications#{}", title_plain);
                         let label = sidebar_label(entry.title);
                         view! {
-                            <li class="tree-post" style="padding-left: 0.75rem">
+                            <li class="tree-post" style="padding-left: 1.5rem">
                                 <A href=href on:click=move |_| close_sidebar()>
                                     {label}
                                 </A>

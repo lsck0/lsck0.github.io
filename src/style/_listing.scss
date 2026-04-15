@@ -119,4 +119,19 @@
     margin-bottom: 0.5rem;
   }
 
+  .project-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+  }
+
+  .project-tool {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: var(--bg-alt);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+  }
+
 }
