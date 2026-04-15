@@ -62,7 +62,7 @@ pub fn include_posts_impl(_input: TokenStream) -> TokenStream {
         page.citations = citation_metas;
 
         // Auto-link definitions
-        resolve::auto_link_definitions(&mut page.content, &registry);
+        resolve::auto_link_definitions(&mut page.content, &slug, &registry);
 
         // Extract internal/external links (registry detects bare cross-refs to other posts)
         let (internal, external) = resolve::extract_links(&page.content, &slug, &registry);
@@ -171,6 +171,22 @@ fn read_single_post(base: &PathBuf, path: &PathBuf) -> Option<Page> {
 
     let mut meta = metadata;
     meta.insert("body".to_string(), body);
+
+    // Infer dates from filesystem if not set in frontmatter
+    if let Ok(file_meta) = fs::metadata(path) {
+        if !meta.contains_key("created")
+            && let Ok(created) = file_meta.created()
+        {
+            let dt: chrono::DateTime<chrono::Utc> = created.into();
+            meta.insert("created".to_string(), dt.format("%Y-%m-%d").to_string());
+        }
+        if !meta.contains_key("last_edited")
+            && let Ok(modified) = file_meta.modified()
+        {
+            let dt: chrono::DateTime<chrono::Utc> = modified.into();
+            meta.insert("last_edited".to_string(), dt.format("%Y-%m-%d").to_string());
+        }
+    }
 
     return Some(Page {
         slug,

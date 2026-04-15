@@ -333,19 +333,31 @@ struct TermEntry {
 
 /// Auto-link definition terms in prose text.
 /// Scans `Text` nodes for known definition titles and wraps them in `CrossRef`.
-pub fn auto_link_definitions(content: &mut [Block], registry: &HashMap<String, LabelInfo>) {
-    // Build term index: sorted longest-first for greedy matching
+pub fn auto_link_definitions(
+    content: &mut [Block],
+    current_slug: &str,
+    registry: &HashMap<String, LabelInfo>,
+) {
+    // Build term index: sorted longest-first for greedy matching.
+    // For definitions in other posts, prefix label with "slug#" so the
+    // renderer generates a cross-post link instead of a same-page anchor.
     let mut terms: Vec<TermEntry> = Vec::new();
     for (label, info) in registry {
         if info.title.is_empty() || info.kind == "proof" || info.kind == "example" || info.kind == "equation" {
             continue;
         }
 
+        let effective_label = if info.slug == current_slug {
+            label.clone()
+        } else {
+            format!("{}#{}", info.slug, label)
+        };
+
         // Primary title
         let title_lower = info.title.to_lowercase();
         terms.push(TermEntry {
             title_lower: title_lower.clone(),
-            label: label.clone(),
+            label: effective_label.clone(),
         });
 
         // Auto-plural
@@ -361,7 +373,7 @@ pub fn auto_link_definitions(content: &mut [Block], registry: &HashMap<String, L
         };
         terms.push(TermEntry {
             title_lower: plural,
-            label: label.clone(),
+            label: effective_label,
         });
     }
 

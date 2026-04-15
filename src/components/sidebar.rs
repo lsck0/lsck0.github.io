@@ -175,7 +175,7 @@ pub fn Sidebar() -> impl IntoView {
                                     }
                                     style=move || {
                                         let padding = format!(
-                                            "padding-left: {}rem",
+                                            "padding-left: calc({}rem + 0.5em)",
                                             depth as f32 * 0.75,
                                         );
                                         if is_path_collapsed(
@@ -268,7 +268,7 @@ pub fn Sidebar() -> impl IntoView {
                                     view! {
                                         <li
                                             class="tree-post"
-                                            style:padding-left="3rem"
+                                            style:padding-left="calc(3rem + 0.5em)"
                                             style:display=move || {
                                                 if state
                                                     .collapsed_project_groups
@@ -325,7 +325,7 @@ pub fn Sidebar() -> impl IntoView {
                             let href = format!("/projects#{}", title_plain);
                             let label = sidebar_label(entry.title);
                             view! {
-                                <li class="tree-post" style="padding-left: 2.25rem">
+                                <li class="tree-post" style="padding-left: calc(2.25rem + 0.5em)">
                                     <A href=href on:click=move |_| close_sidebar()>
                                         {label}
                                     </A>
@@ -461,7 +461,7 @@ pub fn Sidebar() -> impl IntoView {
                         let href = format!("/publications#{}", title_plain);
                         let label = sidebar_label(entry.title);
                         view! {
-                            <li class="tree-post" style="padding-left: 1.5rem">
+                            <li class="tree-post" style="padding-left: calc(1.5rem + 0.5em)">
                                 <A href=href on:click=move |_| close_sidebar()>
                                     {label}
                                 </A>

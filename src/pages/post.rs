@@ -249,15 +249,22 @@ fn render_post(post: &'static Post, scroll_progress: RwSignal<f64>, show_scroll_
                 {(!post.description().is_empty())
                     .then(|| view! { <p class="post-subtitle" inner_html=post.description() /> })}
                 <div class="post-meta">
-                    {(post.last_edited() != post.date() && !post.last_edited().is_empty())
-                        .then(|| {
-                            view! {
-                                <span class="date">
-                                    {post.date_formatted()}{", last edited "}
-                                    {post.last_edited_formatted()}
-                                </span>
-                            }
-                        })}
+                    {if !post.last_edited().is_empty() && post.last_edited() != post.date() {
+                        view! {
+                            <span class="date">
+                                {post.date_formatted()}{", last edited "}
+                                {post.last_edited_formatted()}
+                            </span>
+                        }
+                            .into_any()
+                    } else if !post.date().is_empty() {
+                        view! {
+                            <span class="date">{post.date_formatted()}</span>
+                        }
+                            .into_any()
+                    } else {
+                        view! { <span /> }.into_any()
+                    }}
                     <span class="post-tags">
                         {post
                             .tags()

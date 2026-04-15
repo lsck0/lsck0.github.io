@@ -35,12 +35,13 @@ toc: true
 
 #### Automatic fields
 
-Dates are derived from git history at build time — no manual `date` field needed.
+Dates are inferred from filesystem timestamps at compile time — no manual field needed.
+You can override either field in frontmatter if needed.
 
-| Field         | Source                        | Description                                       |
-| ------------- | ----------------------------- | ------------------------------------------------- |
-| `created`     | First git commit of the file  | Creation date, shown as the post date             |
-| `last_edited` | Latest git commit of the file | Last edit date, shown when different from created |
+| Field         | Source                            | Description                                       |
+| ------------- | --------------------------------- | ------------------------------------------------- |
+| `created`     | File creation time (or override)  | Creation date, shown as the post date             |
+| `last_edited` | File modification time (or override) | Last edit date, shown when different from created |
 
 #### Optional fields
 
@@ -223,8 +224,9 @@ As shown in [[math/group-theory#def:group]], ...
 
 ##### Auto-linking
 
-Definition titles automatically become links when they appear in prose text
-within the same post. No special syntax required.
+Definition titles automatically become links when they appear in prose text.
+This works both within the same post (same-page anchor) and across posts
+(navigates to the source post). No special syntax required.
 
 ````
 ```definition Subgroup {#def:subgroup}
@@ -235,7 +237,8 @@ Every group has at least two subgroups: the trivial subgroup and $G$ itself.
 ````
 
 The word "subgroups" in the prose automatically links to `#def:subgroup` with a
-hover preview, even without writing `[[def:subgroup]]`.
+hover preview, even without writing `[[def:subgroup]]`. If the definition is in
+a different post, the link navigates to that post.
 
 **Aliases:** Definitions can declare multiple names that all auto-link:
 
@@ -558,16 +561,20 @@ and meta descriptions.
 
 The Makefile.toml defines three tasks:
 
-| Task       | Command                                            | Description                                  |
-| ---------- | -------------------------------------------------- | -------------------------------------------- |
-| `dev`      | `trunk serve --port 3000 --open`                   | Development server with HMR                  |
-| `build`    | `trunk build --release` + wasm-opt + indexer + 404 | Production build (single source of truth)    |
-| `ci`       | clippy + fmt check + `makers build`                | CI validation                                |
-| `wasm-opt` | wasm-opt with bulk-memory flags                    | Manual WASM optimization (called by `build`) |
+| Task       | Command                                         | Description                                  |
+| ---------- | ------------------------------------------------ | -------------------------------------------- |
+| `dev`      | `trunk serve --port 3000 --open`                 | Development server with HMR                  |
+| `build`    | `trunk build --release` + wasm-opt + 404 copy    | Production build                             |
+| `ci`       | clippy + fmt check + `makers build`              | CI validation                                |
+| `wasm-opt` | wasm-opt with bulk-memory flags                  | Manual WASM optimization (called by `build`) |
+
+The indexer runs automatically as a Trunk `post_build` hook (configured in
+`Trunk.toml`), so feeds, search index, and OG pages are generated in both
+dev and production builds.
 
 ## Build-time Indexer
 
-Running `cargo run --package indexer` after `trunk build` generates:
+The indexer (`cargo run --package indexer`) runs after every trunk build and generates:
 
 | File                          | Description                                  |
 | ----------------------------- | -------------------------------------------- |
@@ -632,6 +639,7 @@ title = "my-project"
 description = "What it does."
 url = "https://github.com/..."
 status = "maintained"
+tools = ["rust", "wasm"]
 ```
 
 ### Fields
@@ -641,9 +649,10 @@ status = "maintained"
 | `title`       | string or segment[] | Project name                                        |
 | `description` | string or segment[] | Short description                                   |
 | `url`         | string (optional)   | Link (omit for no link)                             |
-| `status`      | string              | One of: `maintained`, `wip`, `planned`, `abandoned` |
+| `status`      | string              | One of: `maintained`, `wip`, `planned`, `abandoned`. Optional for professional projects (defaults to `maintained`) |
 | `company`     | string (optional)   | Company name — marks project as professional        |
 | `anonymous`   | bool (optional)     | If true, shown as professional without company name |
+| `tools`       | string[] (optional) | Languages/libraries/tools used, shown as badges     |
 
 ### Text segments
 

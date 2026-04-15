@@ -88,7 +88,7 @@ fn build_graph() -> (Vec<GraphNode>, Vec<GraphEdge>) {
             let radius = 200.0;
             GraphNode {
                 slug: post.slug().to_string(),
-                title: post.title().to_string(),
+                title: strip_latex(post.title()),
                 tags,
                 x: radius * angle.cos(),
                 y: radius * angle.sin(),
@@ -870,4 +870,73 @@ pub fn GraphView(#[prop(into)] visible_slugs: Signal<Vec<String>>) -> impl IntoV
             <canvas node_ref=canvas_ref class="graph-canvas" />
         </div>
     };
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+/// Strip `$...$` delimiters and common LaTeX commands for canvas text rendering.
+fn strip_latex(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '$' {
+            // consume until closing $
+            let mut inner = String::new();
+            for inner_ch in chars.by_ref() {
+                if inner_ch == '$' {
+                    break;
+                }
+                inner.push(inner_ch);
+            }
+            // strip \mathbb{X} → X, \command → ""
+            result.push_str(&strip_latex_commands(&inner));
+        } else {
+            result.push(ch);
+        }
+    }
+    return result;
+}
+
+fn strip_latex_commands(latex: &str) -> String {
+    let mut result = String::new();
+    let mut chars = latex.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            // consume command name
+            let mut cmd = String::new();
+            while let Some(&next) = chars.peek() {
+                if next.is_ascii_alphabetic() {
+                    cmd.push(next);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            // if followed by {content}, extract content
+            if chars.peek() == Some(&'{') {
+                chars.next(); // skip {
+                let mut depth = 1;
+                let mut content = String::new();
+                for brace_ch in chars.by_ref() {
+                    if brace_ch == '{' {
+                        depth += 1;
+                    } else if brace_ch == '}' {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    content.push(brace_ch);
+                }
+                result.push_str(&strip_latex_commands(&content));
+            }
+        } else if ch == '{' || ch == '}' {
+            // skip stray braces
+        } else {
+            result.push(ch);
+        }
+    }
+    return result;
 }
