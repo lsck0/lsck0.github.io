@@ -38,23 +38,23 @@ toc: true
 Dates are inferred from filesystem timestamps at compile time — no manual field needed.
 You can override either field in frontmatter if needed.
 
-| Field         | Source                            | Description                                       |
-| ------------- | --------------------------------- | ------------------------------------------------- |
-| `created`     | File creation time (or override)  | Creation date, shown as the post date             |
+| Field         | Source                               | Description                                       |
+| ------------- | ------------------------------------ | ------------------------------------------------- |
+| `created`     | File creation time (or override)     | Creation date, shown as the post date             |
 | `last_edited` | File modification time (or override) | Last edit date, shown when different from created |
 
 #### Optional fields
 
-| Field          | Description                                                |
-| -------------- | ---------------------------------------------------------- |
-| `description`  | Short summary shown under the title in the blog listing    |
-| `series`       | Name of a series — posts with the same name are grouped    |
-| `series_order` | Integer ordering within the series (ascending)             |
-| `tags`         | Comma-separated tags, used for filtering on `/blog`        |
-| `project`      | Links this post to a project entry                         |
-| `publication`  | Links this post to a publication entry                     |
-| `sources`      | Comma-separated URLs for references not linked in the body |
-| `draft`        | Set to `true` to show only in dev mode with DRAFT banner   |
+| Field          | Description                                                 |
+| -------------- | ----------------------------------------------------------- |
+| `description`  | Short summary shown under the title in the blog listing     |
+| `series`       | Name of a series — posts with the same name are grouped     |
+| `series_order` | Integer ordering within the series (ascending)              |
+| `tags`         | Comma-separated tags, used for filtering on `/blog`         |
+| `project`      | Links this post to a project entry                          |
+| `publication`  | Links this post to a publication entry                      |
+| `sources`      | Comma-separated URLs for references not linked in the body  |
+| `draft`        | Set to `true` to show only in dev mode with DRAFT banner    |
 | `toc`          | Set to `true` to enable section numbering + collapsible TOC |
 
 ### Content features
@@ -163,19 +163,19 @@ a different purpose and renders differently.
 
 ##### Quick comparison
 
-| Syntax | What it references | Renders as | Hover preview |
-| --- | --- | --- | --- |
-| `[[def:group]]` | Labeled block (same post) | "Definition 1" | Block content with math |
-| `[[thm:lagrange\|Lagrange]]` | Labeled block (custom text) | "Lagrange" | Block content with math |
-| `[[math/group-theory#def:group]]` | Labeled block (other post) | "Definition 1" | Block content with math |
-| `[[eq:first-iso]]` | Numbered equation | "(1)" | Equation content |
-| `[[fig:phase-diagram]]` | Numbered figure | "Figure 1" | Figure content |
-| `[@lang_algebra]` | BibTeX entry | "[1]" | None (scrolls to bibliography) |
-| `[@key1; @key2]` | Multiple BibTeX entries | "[1, 2]" | None |
-| `[^1]` | Footnote | Superscript "1" | None (sidenote on desktop) |
-| `[text](/blog/slug)` | Another post | "text" | Post title, description, tags |
-| `[text](https://...)` | External URL | "text" | Favicon, domain, OG metadata |
-| `![[slug]]` | Another post (embed) | Full post body inline | N/A |
+| Syntax                            | What it references          | Renders as            | Hover preview                  |
+| --------------------------------- | --------------------------- | --------------------- | ------------------------------ |
+| `[[def:group]]`                   | Labeled block (same post)   | "Definition 1"        | Block content with math        |
+| `[[thm:lagrange\|Lagrange]]`      | Labeled block (custom text) | "Lagrange"            | Block content with math        |
+| `[[math/group-theory#def:group]]` | Labeled block (other post)  | "Definition 1"        | Block content with math        |
+| `[[eq:first-iso]]`                | Numbered equation           | "(1)"                 | Equation content               |
+| `[[fig:phase-diagram]]`           | Numbered figure             | "Figure 1"            | Figure content                 |
+| `[@lang_algebra]`                 | BibTeX entry                | "[1]"                 | None (scrolls to bibliography) |
+| `[@key1; @key2]`                  | Multiple BibTeX entries     | "[1, 2]"              | None                           |
+| `[^1]`                            | Footnote                    | Superscript "1"       | None (sidenote on desktop)     |
+| `[text](/blog/slug)`              | Another post                | "text"                | Post title, description, tags  |
+| `[text](https://...)`             | External URL                | "text"                | Favicon, domain, OG metadata   |
+| `![[slug]]`                       | Another post (embed)        | Full post body inline | N/A                            |
 
 ##### Cross-references (`[[label]]`)
 
@@ -215,12 +215,12 @@ As shown in [[math/group-theory#def:group]], ...
 
 **Auto-generated display text by kind:**
 
-| Block kind | Display text |
-| --- | --- |
+| Block kind                            | Display text                      |
+| ------------------------------------- | --------------------------------- |
 | `definition`, `theorem`, `lemma`, ... | "Definition 1", "Theorem 2", etc. |
-| `equation` | "(1)" |
-| `figure` | "Figure 1" |
-| `proof` | "Proof" |
+| `equation`                            | "(1)"                             |
+| `figure`                              | "Figure 1"                        |
+| `proof`                               | "Proof"                           |
 
 ##### Auto-linking
 
@@ -333,8 +333,8 @@ See [@lang_algebra; @dummit_foote; @aluffi] for comprehensive treatments.
 **Bibliography section:** A numbered bibliography is automatically appended to
 any post that uses citations. Entries are formatted as:
 
-> 1. S. Lang. *Algebra*. Springer, 2002.
-> 2. D. S. Dummit, R. M. Foote. *Abstract Algebra*. John Wiley & Sons, 2004.
+> 1. S. Lang. _Algebra_. Springer, 2002.
+> 2. D. S. Dummit, R. M. Foote. _Abstract Algebra_. John Wiley & Sons, 2004.
 
 Only cited entries appear — the full `.bib` file can contain many entries without
 bloating individual posts.
@@ -423,18 +423,18 @@ including prerequisite material or shared definitions without duplicating conten
 
 ##### When to use what
 
-| Situation | Use |
-| --- | --- |
+| Situation                                      | Use                         |
+| ---------------------------------------------- | --------------------------- |
 | Refer to a definition/theorem in the same post | `[[label]]` or auto-linking |
-| Refer to a definition/theorem in another post | `[[slug#label]]` |
-| Refer to a numbered equation | `[[eq:label]]` |
-| Refer to a numbered figure | `[[fig:label]]` |
-| Cite a published book/paper | `[@bib_key]` |
-| Add a tangential remark | `[^N]` footnote |
-| Link to another post for context | `[text](/blog/slug)` |
-| Link to an external resource inline | `[text](https://...)` |
-| List reference URLs without inline citation | `sources:` frontmatter |
-| Include another post's content verbatim | `![[slug]]` |
+| Refer to a definition/theorem in another post  | `[[slug#label]]`            |
+| Refer to a numbered equation                   | `[[eq:label]]`              |
+| Refer to a numbered figure                     | `[[fig:label]]`             |
+| Cite a published book/paper                    | `[@bib_key]`                |
+| Add a tangential remark                        | `[^N]` footnote             |
+| Link to another post for context               | `[text](/blog/slug)`        |
+| Link to an external resource inline            | `[text](https://...)`       |
+| List reference URLs without inline citation    | `sources:` frontmatter      |
+| Include another post's content verbatim        | `![[slug]]`                 |
 
 #### Callouts / Admonitions
 
@@ -467,13 +467,13 @@ the cursor is on the link or the tooltip itself. Tooltips support nested hoverin
 definitions within a hover can themselves be hovered to show stacked tooltips
 (up to 4 levels deep).
 
-| Link type | Preview content |
-| --- | --- |
-| Cross-references (`[[label]]`) | Full block content with rendered KaTeX math |
-| Internal post links (`/blog/slug`) | Title, description, tags, series info |
-| External links (`https://...`) | Favicon, domain, URL path, OG metadata (title, description, image) |
-| Site links (`/about`, `/projects`) | Link text and path |
-| Related posts (in projects/publications) | Post title, description, tags, series |
+| Link type                                | Preview content                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| Cross-references (`[[label]]`)           | Full block content with rendered KaTeX math                        |
+| Internal post links (`/blog/slug`)       | Title, description, tags, series info                              |
+| External links (`https://...`)           | Favicon, domain, URL path, OG metadata (title, description, image) |
+| Site links (`/about`, `/projects`)       | Link text and path                                                 |
+| Related posts (in projects/publications) | Post title, description, tags, series                              |
 
 #### Series navigation
 
@@ -546,13 +546,13 @@ description = "Posts on CS, math, and engineering."
 
 ### Fields
 
-| Field         | Type   | Description                              |
-| ------------- | ------ | ---------------------------------------- |
-| `title`       | string | Site title                              |
-| `description` | string | Site description for meta tags           |
-| `author`      | string | Author name                             |
-| `url`         | string | Site URL (used for OG URLs)              |
-| `image`       | string | Default OG image URL (optional)          |
+| Field         | Type   | Description                     |
+| ------------- | ------ | ------------------------------- |
+| `title`       | string | Site title                      |
+| `description` | string | Site description for meta tags  |
+| `author`      | string | Author name                     |
+| `url`         | string | Site URL (used for OG URLs)     |
+| `image`       | string | Default OG image URL (optional) |
 
 Each page section provides a title and description used for `<title>` tags
 and meta descriptions.
@@ -561,12 +561,12 @@ and meta descriptions.
 
 The Makefile.toml defines three tasks:
 
-| Task       | Command                                         | Description                                  |
-| ---------- | ------------------------------------------------ | -------------------------------------------- |
-| `dev`      | `trunk serve --port 3000 --open`                 | Development server with HMR                  |
-| `build`    | `trunk build --release` + wasm-opt + 404 copy    | Production build                             |
-| `ci`       | clippy + fmt check + `makers build`              | CI validation                                |
-| `wasm-opt` | wasm-opt with bulk-memory flags                  | Manual WASM optimization (called by `build`) |
+| Task       | Command                                       | Description                                  |
+| ---------- | --------------------------------------------- | -------------------------------------------- |
+| `dev`      | `trunk serve --port 3000 --open`              | Development server with HMR                  |
+| `build`    | `trunk build --release` + wasm-opt + 404 copy | Production build                             |
+| `ci`       | clippy + fmt check + `makers build`           | CI validation                                |
+| `wasm-opt` | wasm-opt with bulk-memory flags               | Manual WASM optimization (called by `build`) |
 
 The indexer runs automatically as a Trunk `post_build` hook (configured in
 `Trunk.toml`), so feeds, search index, and OG pages are generated in both
@@ -599,13 +599,13 @@ Bookmark and read state is managed via localStorage through a centralized
 `components/storage` module. All pages use the same module — no duplicated
 localStorage access patterns.
 
-| Key pattern       | Value                | Description                              |
-| ----------------- | -------------------- | ---------------------------------------- |
-| `bookmark:{slug}` | `"1"`                | Post is bookmarked                       |
-| `read:{slug}`     | timestamp            | Post has been viewed                     |
-| `theme`           | `"dark"` / `"light"` | Current theme                            |
-| `pinned-blocks`   | JSON array           | Pinned labeled blocks with preview HTML  |
-| `study-scores`    | JSON object          | Per-block right/unsure/wrong counts      |
+| Key pattern       | Value                | Description                             |
+| ----------------- | -------------------- | --------------------------------------- |
+| `bookmark:{slug}` | `"1"`                | Post is bookmarked                      |
+| `read:{slug}`     | timestamp            | Post has been viewed                    |
+| `theme`           | `"dark"` / `"light"` | Current theme                           |
+| `pinned-blocks`   | JSON array           | Pinned labeled blocks with preview HTML |
+| `study-scores`    | JSON object          | Per-block right/unsure/wrong counts     |
 
 ## Content Pipeline Architecture
 
@@ -644,15 +644,15 @@ tools = ["rust", "wasm"]
 
 ### Fields
 
-| Field         | Type                | Description                                         |
-| ------------- | ------------------- | --------------------------------------------------- |
-| `title`       | string or segment[] | Project name                                        |
-| `description` | string or segment[] | Short description                                   |
-| `url`         | string (optional)   | Link (omit for no link)                             |
+| Field         | Type                | Description                                                                                                        |
+| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `title`       | string or segment[] | Project name                                                                                                       |
+| `description` | string or segment[] | Short description                                                                                                  |
+| `url`         | string (optional)   | Link (omit for no link)                                                                                            |
 | `status`      | string              | One of: `maintained`, `wip`, `planned`, `abandoned`. Optional for professional projects (defaults to `maintained`) |
-| `company`     | string (optional)   | Company name — marks project as professional        |
-| `anonymous`   | bool (optional)     | If true, shown as professional without company name |
-| `tools`       | string[] (optional) | Languages/libraries/tools used, shown as badges     |
+| `company`     | string (optional)   | Company name — marks project as professional                                                                       |
+| `anonymous`   | bool (optional)     | If true, shown as professional without company name                                                                |
+| `tools`       | string[] (optional) | Languages/libraries/tools used, shown as badges                                                                    |
 
 ### Text segments
 
@@ -717,13 +717,13 @@ editing. It indexes all post labels, BibTeX entries, and post slugs from the
 
 ### Features
 
-| Feature | Trigger | Description |
-| --- | --- | --- |
-| Autocomplete | `[[` | Suggests all labels (definitions, theorems, etc.) and post slugs |
-| Autocomplete | `[@` | Suggests BibTeX keys from `content/references.bib` |
-| Go-to-definition | `[[label]]` | Jumps to the source file containing the labeled block |
-| Diagnostics | On save | Warns about undefined `[[label]]` or `[@key]` references |
-| Index rebuild | On save | Automatically re-indexes when any `.md` file is saved |
+| Feature          | Trigger     | Description                                                      |
+| ---------------- | ----------- | ---------------------------------------------------------------- |
+| Autocomplete     | `[[`        | Suggests all labels (definitions, theorems, etc.) and post slugs |
+| Autocomplete     | `[@`        | Suggests BibTeX keys from `content/references.bib`               |
+| Go-to-definition | `[[label]]` | Jumps to the source file containing the labeled block            |
+| Diagnostics      | On save     | Warns about undefined `[[label]]` or `[@key]` references         |
+| Index rebuild    | On save     | Automatically re-indexes when any `.md` file is saved            |
 
 ### How it works
 

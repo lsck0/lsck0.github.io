@@ -1,41 +1,22 @@
 [[publications]]
-title = "cs"
-description = "Sample entry — replace with actual publication details, venue, and year."
-url = "https://arxiv.org"
-authors = "L. Sandrock, A. Coauthor"
+authors = "Komal Abbas, Luca Sandrock, Barbara Hanfstingl"
+title = [{ scrambled = 20 }]
+description = [{ scrambled = 70 }]
 date = "2026"
 
 [[publications]]
-title = "math"
-description = "On the structure of \\(\\mathbb{Z}[i]\\) as a Euclidean domain — sample entry."
-url = "https://arxiv.org"
-authors = "L. Sandrock, B. Coauthor"
-date = "2025"
-
-[[publications]]
-title = [{ scrambled = 30 }]
-description = [{ scrambled = 60 }]
-url = ""
-authors = ["L. Sandrock, ", { scrambled = 12 }]
-date = "2026"
-
-[[publications]]
-title = "Type Inference for Dependent Types"
-description = "Extending Hindley-Milner with dependent types. Covers constraint solving and unification algorithms."
-url = "https://arxiv.org"
-authors = "L. Sandrock"
-date = "2024"
-
-[[publications]]
-title = "A Category-Theoretic View of Neural Networks"
-description = "Formalizing neural network architectures as functors between categories of vector spaces."
-url = "https://arxiv.org"
-authors = "L. Sandrock, S. Category"
-date = "2024"
-
-[[publications]]
-title = "Constructive Set Theory in Lean"
-description = "FormalizingZF set theory in Lean's dependent type theory. Exploring the ordinal hierarchy."
-url = "https://github.com/lsck0/lean-set-theory"
-authors = "L. Sandrock"
-date = "2023"
+title = "Topological Complexity of Symplectic CW-Complexes"
+description = """
+  A cohomology class $u$ of a topological space $X$ is atoroidal if its pullback to the torus vanishes for every
+  map from a torus to $X$. Furthermore, a CW-complex $X$ of dimension $2n$ is called atoroidally symplectic if there
+  exists an atoroidal cohomology class $u\\in H^2_{sing}(X; F)$ (for some coefficient field $F$ with either
+  $\\char(F)=0$ or $\\char(F)>2n$) such that $u^n \\not = 0$.
+  We prove that every atoroidally symplectic CW-complex $X$ of dimension $2n$ has topological complexity $4n$.
+  This generalizes a result of Grant and Mescher who prove the corresponding statement in the case where $X$ is an
+  atoroidally c-symplectic manifold and $u$ is a de Rham cohomology class.
+  Using this generalisation, we obtain new calculations of topological complexity, including for many
+  products of 3-manifolds and of group presentation complexes.
+"""
+url = "https://arxiv.org/abs/2505.19324"
+authors = "Luca Sandrock, Thomas Schick"
+date = "25 May 2025"

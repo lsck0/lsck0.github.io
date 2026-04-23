@@ -2,13 +2,16 @@
 
 ## 1. License
 
-All content on this website — including blog posts, articles, code samples, diagrams, and images — is licensed under the [MIT License](https://opensource.org/licenses/MIT) unless otherwise stated.
+All content on this website — including blog posts, articles, code samples, diagrams, and images — is licensed under the
+[MIT License](https://opensource.org/licenses/MIT) unless otherwise stated.
 
-You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the content, subject to the conditions below.
+You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the content, subject
+to the conditions below.
 
 ## 2. AI Training Restriction
 
-Notwithstanding the MIT License grant above, this website and all its content **explicitly opt out of artificial intelligence and machine learning model training**.
+Notwithstanding the MIT License grant above, this website and all its content **explicitly opt out of artificial intelligence
+and machine learning model training**.
 
 ### You may NOT:
 
@@ -19,7 +22,7 @@ Notwithstanding the MIT License grant above, this website and all its content **
 
 ### You MAY:
 
-- Use AI tools to *summarize* content for personal use (not for redistribution)
+- Use AI tools to _summarize_ content for personal use (not for redistribution)
 - Use code samples from this site in your own projects (per the MIT License)
 
 ## 3. Attribution
@@ -37,7 +40,8 @@ Non-AI scraping is permitted for:
 
 ## 5. Enforcement
 
-Violation of the AI training restriction may result in legal action under applicable copyright and intellectual property laws, including but not limited to the EU Copyright Directive (2019/790), the German Copyright Act (UrhG), and the US Digital Millennium Copyright Act (DMCA).
+Violation of the AI training restriction may result in legal action under applicable copyright and intellectual property laws,
+including but not limited to the EU Copyright Directive (2019/790), the German Copyright Act (UrhG), and the US Digital Millennium Copyright Act (DMCA).
 
 ## 6. Contact
 

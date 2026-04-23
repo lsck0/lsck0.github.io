@@ -1,27 +1,36 @@
 # /dev/lsck0
 
-Welcome. This is my personal corner of the internet.
+Welcome to my homepage.
 
 ## Background
 
-I'm a computer science student interested in programming language theory, type systems, and formal methods. I spend most of my time writing Rust, thinking about abstractions, and occasionally proving things.
+I am a 25-year-old Master’s student in Mathematics at the University of Göttingen and a Software Engineer at Capgemini,
+with nearly a decade of programming experience.
+
+My mathematics interests are mainly:
+
+- Category Theory
+- Homological Algebra
+- Algebraic Topology
+- Differential Topology
+
+My programming interests are mainly:
+
+- Software Architecture
+- Systems Programming
+- Game Development
+
+I primarily work with C and Rust, but have experience with a range of other languages as well as tools and libraries,
+covering most modern technologies.
 
 ## This site
 
-Built from scratch with [Leptos](https://leptos.dev/) (Rust WASM framework). Content is markdown compiled into the binary at build time via proc macros. No JavaScript frameworks, no server — just Rust all the way down.
+This site serves three purposes:
 
-Features include LaTeX math rendering, TikZ diagrams, Mermaid charts, fuzzy search, series navigation, a knowledge graph, and a build-time indexer that generates feeds, sitemaps, and OpenGraph metadata.
-
-The source is on [GitHub](https://github.com/lsck0/lsck0.github.io).
-
-## Interests
-
-- **Programming language theory** — lambda calculus, type inference, evaluation strategies
-- **Abstract algebra** — groups, rings, category theory
-- **Topology and analysis** — continuity, fixed points, metric spaces
-- **Systems programming** — Rust, compilers, build tools
-- **Technical writing** — making complex ideas accessible
+- A portfolio collecting my projects and publications
+- A space for writing about mathematics and programming
+- A mathematics-focused wiki collecting what I have learned (heavily WIP)
 
 ## Contact
 
-Find me on [GitHub](https://github.com/lsck0).
+Find me on GitHub: [https://github.com/lsck0](https://github.com/lsck0)

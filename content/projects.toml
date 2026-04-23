@@ -1,57 +1,178 @@
+# maintained
+
+[[projects]]
+title = "arch-dotfiles"
+description = "Installation and configuration files for hyprland arch."
+url = "https://github.com/lsck0/arch-dotfiles"
+status = "maintained"
+tools = ["linux", "shell"]
+
+[[projects]]
+title = "homelab"
+description = "Homelab config via terraform and nixos."
+url = "https://github.com/lsck0/homelab"
+status = "maintained"
+tools = ["proxmox", "terraform", "nix", "nixos"]
+
 [[projects]]
 title = "lsck0.github.io"
-description = "This site — a personal blog and portfolio built with Rust, Leptos, and WebAssembly."
+description = "This website."
 url = "https://github.com/lsck0/lsck0.github.io"
 status = "maintained"
+tools = ["rust", "scss", "markdown"]
 
 [[projects]]
-title = "plt"
-description = "Notes and experiments on programming language theory, type systems, and formal methods."
-url = "https://github.com/lsck0"
-status = "wip"
-
-[[projects]]
-title = "dotfiles"
-description = "Neovim, tmux, zsh, and Alacritty configs. Nix-managed where possible."
-url = "https://github.com/lsck0/dotfiles"
+title = "wayland-boomer"
+description = "Wayland alternative for tsoding's X11 boomer."
+url = "https://github.com/lsck0/wayland-boomer"
 status = "maintained"
+tools = ["c", "raylib"]
 
 [[projects]]
-title = ["type-", { scrambled = 8 }]
-description = [{ scrambled = 50 }]
+title = "webapp-template"
+description = "Comprehensive Webapp Template."
+status = "maintained"
+tools = [
+    "aws",
+    "vps",
+    "terraform",
+    "docker",
+    "dockerswarm",
+    "nginx",
+    "grafana ecosystem",
+    "rust",
+    "axum",
+    "python",
+    "fastapi",
+    "sqlalchemy",
+    "typescript",
+    "react",
+    "tailwindcss",
+    "scss",
+    "jwt",
+    "postgresql",
+    "redis",
+    "minio",
+    "websockets",
+    "...",
+]
+
+# wip
+
+[[projects]]
+title = "jj-project"
+description = [{ scrambled = 32 }]
+status = "wip"
+tools = ["python", "numpy", "pandas", "scikit-learn", "holoviews"]
+
+[[projects]]
+title = "nyangine"
+description = "2D/3D Game Engine."
+url = "https://github.com/lsck0/nyangine"
+status = "wip"
+tools = ["c", "hlsl", "sdl3"]
+
+[[projects]]
+title = "ruey"
+description = "Twitch Bot Client with embedded Scripting Language."
+status = "wip"
+tools = ["rust", "egui"]
+
+[[projects]]
+title = "gogle"
+description = "Community Project: Semantic Web Search Engine"
+url = "https://github.com/lsck0/gogle"
+status = "wip"
+tools = ["go", "postgresql"]
+
+# planned
+
+[[projects]]
+title = "purr!"
+description = [
+    "Test-Driving the engine and making a ",
+    { scrambled = 14 },
+    " game.",
+]
 status = "planned"
+tools = ["c", "nyangine"]
 
 [[projects]]
-title = "old-blog"
-description = "Previous iteration of this site, built with Hugo. Replaced by the current Leptos/WASM stack."
+title = "specturm"
+description = "A procedurally generated rouge-lite tower defense game about color."
+status = "planned"
+tools = ["c", "nyangine"]
+
+# abandoned
+
+[[projects]]
+title = "nixos-dotfiles"
+description = "Installation and configuration files for hyprland nixos."
+url = "https://github.com/lsck0/nixos-dotfiles"
 status = "abandoned"
+tools = ["nix"]
 
 [[projects]]
-title = "haskell-playground"
-description = "Interactive Haskell REPL in the browser with syntax highlighting and basic evaluation."
-url = "https://github.com/lsck0/haskell-playground"
-status = "wip"
+title = "belOS"
+description = "Minimal x86-64 Operating System Kernel."
+status = "abandoned"
+tools = ["nasm", "rust", "qemu"]
 
 [[projects]]
-title = "category-theory-notes"
-description = "Formalized category theory in Agda. Covers functors, natural transformations, and adjunctions."
-url = "https://github.com/lsck0/category-theory-notes"
-status = "maintained"
+title = "projectethanol"
+description = "Cocktail Machine Software."
+status = "abandoned"
+tools = ["arduino", "raspberrypi", "c", "rust", "tauri"]
 
 [[projects]]
-title = "lean-game"
-description = "An interactive proof assistant tutorial for learning dependent type theory through puzzles."
-status = "planned"
+title = [{ scrambled = 12 }]
+description = "Several Small Compilers, Transpilers and Interpreters."
+status = "abandoned"
+tools = ["c", "rust", "python", "qbe", "llvm", "cranelift"]
+
+# professional
 
 [[projects]]
-title = "Corporate Dashboard"
-description = "Internal analytics dashboard for a Fortune 500 company. Technologies: React, GraphQL, PostgreSQL."
-status = "maintained"
-company = "Acme Corp"
+title = "Software Defined Defense"
+description = "Battlefield Digital-Twin using Unreal Engine with large scale data collection, processing and mission suggestions, showcased at AFCEA 2026 in Bonn."
+company = "Capgemini"
 
 [[projects]]
-title = "Client Portal"
-description = "Secure client-facing portal for a financial services firm. Built with Vue.js and .NET Core."
-status = "wip"
-company = "Confidential"
-anonymous = true
+title = "Military Feedback Tool"
+description = "Survey analysis tool taking reports in the form of text, voice, image and video to visualize dissatisfaction or grievances showcased at AFCEA 2026 in Bonn."
+company = "Capgemini"
+
+[[projects]]
+title = "VR Warcrimes"
+description = "Creating VR environments from crime scenes using drones to safely secure evidence, showcased at AWS Re-Invent 2025 in Las Vegas."
+company = "Capgemini"
+
+[[projects]]
+title = "Military Career Advice"
+description = "Scraping the ministry job platform to suggest fitting career paths given a CV, showcased at AFCEA 2025 in Bonn."
+company = "Capgemini"
+
+[[projects]]
+title = [{ scrambled = 7 }]
+description = "Software Architecture validation and verification given a rulebook."
+company = "Capgemini"
+
+[[projects]]
+title = [{ scrambled = 7 }, " ", { scrambled = 9 }, " ", { scrambled = 4 }]
+description = "Dynamically showing virtual roadsigns in vehicle dashboards given police, ambulance and firebrigade control center notifications."
+company = "Capgemini"
+
+[[projects]]
+title = [{ scrambled = 10 }]
+description = "Multi-Modal routing system through water, land, and air for heavy load transport."
+company = "Capgemini"
+
+[[projects]]
+title = [{ scrambled = 12 }]
+description = "EU sales tax platform with anomaly detection."
+company = "Capgemini"
+
+[[projects]]
+title = [{ scrambled = 6 }]
+description = "Amending easy language translations to government documents via integration into ministry workflows."
+company = "Capgemini"

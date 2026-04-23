@@ -6,7 +6,6 @@
 %   \newcommand{\name}[N]{expansion}       — N positional arguments (#1, #2, ...)
 %   \renewcommand works identically.
 %
-% Lines starting with % are comments. Blank lines are ignored.
 
 % ---- Blackboard bold letters ----
 \newcommand{\A}{\mathbb{A}}
@@ -36,6 +35,34 @@
 \newcommand{\Y}{\mathbb{Y}}
 \newcommand{\Z}{\mathbb{Z}}
 
+% ---- Bold letters ----
+\newcommand{\bA}{\mathbf{A}}
+\newcommand{\bB}{\mathbf{B}}
+\newcommand{\bC}{\mathbf{C}}
+\newcommand{\bD}{\mathbf{D}}
+\newcommand{\bE}{\mathbf{E}}
+\newcommand{\bF}{\mathbf{F}}
+\newcommand{\bG}{\mathbf{G}}
+\newcommand{\bH}{\mathbf{H}}
+\newcommand{\bI}{\mathbf{I}}
+\newcommand{\bJ}{\mathbf{J}}
+\newcommand{\bK}{\mathbf{K}}
+\newcommand{\bL}{\mathbf{L}}
+\newcommand{\bM}{\mathbf{M}}
+\newcommand{\bN}{\mathbf{N}}
+\newcommand{\bO}{\mathbf{O}}
+\newcommand{\bP}{\mathbf{P}}
+\newcommand{\bQ}{\mathbf{Q}}
+\newcommand{\bR}{\mathbf{R}}
+\newcommand{\bS}{\mathbf{S}}
+\newcommand{\bT}{\mathbf{T}}
+\newcommand{\bU}{\mathbf{U}}
+\newcommand{\bV}{\mathbf{V}}
+\newcommand{\bW}{\mathbf{W}}
+\newcommand{\bX}{\mathbf{X}}
+\newcommand{\bY}{\mathbf{Y}}
+\newcommand{\bZ}{\mathbf{Z}}
+
 % ---- Calligraphic letters ----
 \newcommand{\cA}{\mathcal{A}}
 \newcommand{\cB}{\mathcal{B}}
@@ -63,6 +90,34 @@
 \newcommand{\cX}{\mathcal{X}}
 \newcommand{\cY}{\mathcal{Y}}
 \newcommand{\cZ}{\mathcal{Z}}
+
+% ---- Sans-serif letters ----
+\newcommand{\sA}{\mathsf{A}}
+\newcommand{\sB}{\mathsf{B}}
+\newcommand{\sC}{\mathsf{C}}
+\newcommand{\sD}{\mathsf{D}}
+\newcommand{\sE}{\mathsf{E}}
+\newcommand{\sF}{\mathsf{F}}
+\newcommand{\sG}{\mathsf{G}}
+\newcommand{\sH}{\mathsf{H}}
+\newcommand{\sI}{\mathsf{I}}
+\newcommand{\sJ}{\mathsf{J}}
+\newcommand{\sK}{\mathsf{K}}
+\newcommand{\sL}{\mathsf{L}}
+\newcommand{\sM}{\mathsf{M}}
+\newcommand{\sN}{\mathsf{N}}
+\newcommand{\sO}{\mathsf{O}}
+\newcommand{\sP}{\mathsf{P}}
+\newcommand{\sQ}{\mathsf{Q}}
+\newcommand{\sR}{\mathsf{R}}
+\newcommand{\sS}{\mathsf{S}}
+\newcommand{\sT}{\mathsf{T}}
+\newcommand{\sU}{\mathsf{U}}
+\newcommand{\sV}{\mathsf{V}}
+\newcommand{\sW}{\mathsf{W}}
+\newcommand{\sX}{\mathsf{X}}
+\newcommand{\sY}{\mathsf{Y}}
+\newcommand{\sZ}{\mathsf{Z}}
 
 % ---- Fraktur letters ----
 \newcommand{\fA}{\mathfrak{A}}
@@ -113,6 +168,7 @@
 \newcommand{\Sp}[1]{\left\langle #1 \right\rangle}
 \newcommand{\Abs}[1]{\left\lvert #1 \right\rvert}
 \newcommand{\Norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\Res}[2]{\left. #1 \right\rvert_{#2}}
 
 % ---- Derivatives ----
 \newcommand{\del}{\partial}
@@ -124,17 +180,22 @@
 \newcommand{\case}[1]{\begin{cases} #1 \end{cases}}
 
 % ---- Category names ----
-\newcommand{\Set}{\mathsf{Set}}
-\newcommand{\FinSet}{\mathsf{FinSet}}
 \newcommand{\AbGroup}{\mathsf{AbGroup}}
-\newcommand{\Group}{\mathsf{Group}}
-\newcommand{\Rng}{\mathsf{Rng}}
-\newcommand{\Ring}{\mathsf{Ring}}
+\newcommand{\Alg}{\mathsf{Alg}}
+\newcommand{\FTop}{\mathsf{FTop}}
 \newcommand{\Field}{\mathsf{Field}}
-\newcommand{\Mod}{\mathsf{Mod}}
-\newcommand{\Vect}{\mathsf{Vect}}
-\newcommand{\Top}{\mathsf{Top}}
+\newcommand{\FinSet}{\mathsf{FinSet}}
+\newcommand{\Group}{\mathsf{Group}}
 \newcommand{\Mfd}{\mathsf{Mfd}}
+\newcommand{\Mod}{\mathsf{Mod}}
+\newcommand{\PoSet}{\mathsf{PoSet}}
+\newcommand{\Ring}{\mathsf{Ring}}
+\newcommand{\Rng}{\mathsf{Rng}}
+\newcommand{\Set}{\mathsf{Set}}
+\newcommand{\Top}{\mathsf{Top}}
+\newcommand{\Var}{\mathsf{Var}}
+\newcommand{\Vect}{\mathsf{Vect}}
+\newcommand{\gMod}{\mathsf{gMod}}
 
 % ---- Operators ----
 \newcommand{\Alt}{\mathrm{Alt}}
@@ -149,13 +210,16 @@
 \newcommand{\Mat}{\mathrm{Mat}}
 \newcommand{\Mor}{\mathrm{Mor}}
 \newcommand{\RP}{\mathbb{R} P}
+\newcommand{\Spec}{\mathrm{Spec}}
 \newcommand{\Sym}{\mathrm{Sym}}
 \newcommand{\TC}{\mathsf{TC}}
 \newcommand{\Tor}{\mathrm{Tor}}
 \newcommand{\Zmod}[1]{\mathbb{Z} / #1 \mathbb{Z}}
 
 % ---- Small operators ----
+\newcommand{\bcd}{\mathrm{bcd}}
 \newcommand{\cat}{\mathsf{cat}}
+\newcommand{\char}{\mathrm{char}}
 \newcommand{\cl}{\mathrm{cl}}
 \newcommand{\codom}{\mathrm{codom}}
 \newcommand{\colim}{\mathrm{colim}}
@@ -170,3 +234,10 @@
 \newcommand{\tr}{\mathrm{tr}}
 \newcommand{\wgt}{\mathrm{wgt}}
 \newcommand{\zcl}{\mathrm{zcl}}
+
+% ---- Utilities ----
+\newcommand{\coloniff}{:\!\iff}
+\newcommand{\inred}[1]{\textcolor{red}{#1}}
+\newcommand{\inyellow}[1]{\textcolor{yellow}{#1}}
+\newcommand{\inblue}[1]{\textcolor{blue}{#1}}
+\newcommand{\ingreen}[1]{\textcolor{green}{#1}}
